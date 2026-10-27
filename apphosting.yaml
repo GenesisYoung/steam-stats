@@ -17,23 +17,23 @@ env:
   # NODE_ENV must stay runtime-only: at build time devDependencies (vite, tsup) are needed.
   - variable: NODE_ENV
     value: production
-    availability: [RUNTIME]
+    availability: [ RUNTIME ]
   - variable: FRONTEND_DIST
     value: frontend/dist
-    availability: [RUNTIME]
+    availability: [ RUNTIME ]
   # Your App Hosting domain (and custom domain, if you add one later).
   - variable: PUBLIC_APP_URL
     value: https://steam-stats--steam-stats-b4dd8.us-east4.hosted.app
-    availability: [RUNTIME]
+    availability: [ RUNTIME ]
   - variable: PUBLIC_API_URL
     value: https://steam-stats--steam-stats-b4dd8.us-east4.hosted.app
-    availability: [RUNTIME]
+    availability: [ RUNTIME ]
   - variable: TRUST_PROXY
     value: "1"
-    availability: [RUNTIME]
+    availability: [ RUNTIME ]
   - variable: REQUIRE_EMAIL_VERIFIED
     value: "true"
-    availability: [RUNTIME]
+    availability: [ RUNTIME ]
   # FIREBASE_PROJECT_ID is read from FIREBASE_CONFIG, and the web SDK config from
   # FIREBASE_WEBAPP_CONFIG; App Hosting provides both automatically.
 
@@ -42,7 +42,6 @@ env:
   #   npx firebase apphosting:secrets:set cron-secret --project steam-stats-b4dd8
   - variable: STEAM_API_KEY
     secret: steam-api-key
-    availability: [RUNTIME]
+    availability: [ RUNTIME ]
   - variable: CRON_SECRET
     secret: cron-secret
-    availability: [RUNTIME]
