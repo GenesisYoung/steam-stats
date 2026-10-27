@@ -85,7 +85,9 @@ export class PricingService {
     const needsMeta = appIds
       .filter((id) => {
         const m = meta.get(id);
-        return !m || now.getTime() - m.fetchedAt.getTime() > METADATA_TTL_MS;
+        // Backfill pre-cover metadata on the next sync instead of waiting up to 30 days.
+        // An explicit null means Steam supplied no usable cover; do not retry every sync.
+        return !m || m.headerImageUrl === undefined || now.getTime() - m.fetchedAt.getTime() > METADATA_TTL_MS;
       })
       .sort((a, b) => Number(prices.get(b)?.status !== 'priced') - Number(prices.get(a)?.status !== 'priced'));
 
@@ -94,7 +96,7 @@ export class PricingService {
     for (const appId of metaBatch) {
       try {
         const b = await this.store.getAppBasics(appId, region);
-        metaDocs.push({ appId, type: b.type, isFree: b.isFree, name: b.name, storeStatus: b.available ? 'ok' : 'unavailable', fetchedAt: now });
+        metaDocs.push({ appId, type: b.type, isFree: b.isFree, name: b.name, headerImageUrl: b.headerImageUrl, storeStatus: b.available ? 'ok' : 'unavailable', fetchedAt: now });
       } catch (err) {
         logger.warn('app metadata failed', { appId, error: (err as Error).message });
         break; // store is struggling; resume next sync

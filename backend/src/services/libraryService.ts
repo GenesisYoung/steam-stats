@@ -44,7 +44,7 @@ export function toListItem(e: LibraryEntry, region: string): GameListItemDto {
   return {
     appId: g.appId,
     name: g.name,
-    coverUrl: steamCoverUrl(g.appId),
+    coverUrl: steamCoverUrl(g.appId, e.meta?.headerImageUrl),
     iconUrl: steamIconUrl(g.appId, g.iconHash),
     playtimeForeverMinutes: g.playtimeForeverMinutes,
     playtimeHours: round(minutesToHours(g.playtimeForeverMinutes), 1),

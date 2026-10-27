@@ -169,6 +169,8 @@ export interface AppMetadataDoc {
   type: string | null;
   isFree: boolean | null;
   name: string | null;
+  /** Store-provided cover URL, including the asset hash. Undefined on older cached documents. */
+  headerImageUrl?: string | null;
   /** 'unavailable' = store returned success:false (delisted or region-locked). */
   storeStatus: 'ok' | 'unavailable';
   fetchedAt: Date;

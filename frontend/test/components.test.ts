@@ -27,6 +27,18 @@ const game = (over: Partial<GameListItemDto> = {}): GameListItemDto => ({
 });
 
 describe('GameCard', () => {
+  it('retries a failed image when synchronization supplies a new cover URL', async () => {
+    const w = mount(GameCard, { props: { game: game() }, global: global() });
+    await w.find('img').trigger('error');
+    expect(w.find('img').exists()).toBe(false);
+
+    const coverUrl = 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/10/asset-hash/header.jpg';
+    await w.setProps({ game: game({ coverUrl }) });
+    expect(w.find('img').attributes('src')).toBe(coverUrl);
+    await w.find('img').trigger('error');
+    expect(w.find('img').exists()).toBe(false);
+  });
+
   it('shows explicit unavailable / not played states instead of zero', () => {
     const w = mount(GameCard, { props: { game: game() }, global: global() });
     expect(w.text()).toContain('Not played');

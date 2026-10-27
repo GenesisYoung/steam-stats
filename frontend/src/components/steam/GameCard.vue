@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import type { GameListItemDto } from '@steam-analytics/shared';
 import { useFormat } from '@/composables/useFormat';
 import AchievementProgress from './AchievementProgress.vue';
 import PriceTag from './PriceTag.vue';
 
-defineProps<{ game: GameListItemDto }>();
+const props = defineProps<{ game: GameListItemDto }>();
 const f = useFormat();
 const imgFailed = ref(false);
+watch(() => props.game.coverUrl, () => { imgFailed.value = false; });
 </script>
 
 <template>

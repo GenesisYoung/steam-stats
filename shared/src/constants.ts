@@ -52,8 +52,9 @@ export const STEAM_PERSONA_STATES = [
 ] as const;
 export type SteamPersonaState = (typeof STEAM_PERSONA_STATES)[number];
 
-export const steamCoverUrl = (appId: number) =>
-  `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`;
+/** Prefer the store's URL: newer assets include a hash that cannot be derived from the AppID. */
+export const steamCoverUrl = (appId: number, headerImageUrl?: string | null) =>
+  headerImageUrl ?? `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`;
 
 export const steamIconUrl = (appId: number, hash: string | null | undefined) =>
   hash ? `https://media.steampowered.com/steamcommunity/public/images/apps/${appId}/${hash}.jpg` : null;

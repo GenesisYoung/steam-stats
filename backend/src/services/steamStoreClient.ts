@@ -29,6 +29,7 @@ const basicDataSchema = z.object({
   type: z.string().optional(),
   name: z.string().optional(),
   is_free: z.boolean().optional(),
+  header_image: z.url({ protocol: /^https$/, hostname: /\.(steamstatic\.com|akamaihd\.net)$/i }).nullish().catch(null),
 });
 
 export interface StorePrice {
@@ -47,6 +48,7 @@ export interface StoreAppBasics {
   type: string | null;
   name: string | null;
   isFree: boolean | null;
+  headerImageUrl: string | null;
 }
 
 export class SteamStoreClient {
@@ -94,13 +96,13 @@ export class SteamStoreClient {
     });
   }
 
-  /** Store type / free flag for one app (used to classify games vs software and free titles). */
+  /** Store type, free flag and actual cover URL for one app. */
   async getAppBasics(appId: number, region: string): Promise<StoreAppBasics> {
     const data = await this.fetch(new URLSearchParams({ appids: String(appId), cc: region, filters: 'basic', l: 'english' }));
     const entry = data[String(appId)];
-    if (!entry || !entry.success) return { appId, available: false, type: null, name: null, isFree: null };
+    if (!entry || !entry.success) return { appId, available: false, type: null, name: null, isFree: null, headerImageUrl: null };
     const basic = basicDataSchema.safeParse(entry.data);
-    if (!basic.success) return { appId, available: true, type: null, name: null, isFree: null };
-    return { appId, available: true, type: basic.data.type ?? null, name: basic.data.name ?? null, isFree: basic.data.is_free ?? null };
+    if (!basic.success) return { appId, available: true, type: null, name: null, isFree: null, headerImageUrl: null };
+    return { appId, available: true, type: basic.data.type ?? null, name: basic.data.name ?? null, isFree: basic.data.is_free ?? null, headerImageUrl: basic.data.header_image ?? null };
   }
 }

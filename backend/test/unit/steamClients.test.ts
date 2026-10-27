@@ -1,9 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { steamCoverUrl, type AppMetadataDoc, type AppPriceDoc } from '@steam-analytics/shared';
 import { UpstreamError } from '../../src/lib/errors';
 import { TokenBucket } from '../../src/lib/http';
 import { SteamApiClient } from '../../src/services/steamApiClient';
 import { SteamStoreClient } from '../../src/services/steamStoreClient';
-import { effectivePrice } from '../../src/services/pricingService';
+import { effectivePrice, PricingService } from '../../src/services/pricingService';
+import { toListItem } from '../../src/services/libraryService';
+import { mergeOwnedGame } from '../../src/services/syncService';
+import type { AppCacheRepository } from '../../src/repositories/appCacheRepository';
 import { FakeSteam } from '../helpers/fakeSteam';
 
 const KEY = 'A'.repeat(32);
@@ -91,6 +95,63 @@ describe('SteamStoreClient', () => {
     expect(await store.getAppBasics(20, 'us')).toMatchObject({ available: true, isFree: true, type: 'game' });
     expect(await store.getAppBasics(30, 'us')).toMatchObject({ available: false });
   });
+
+  it.each([
+    [3548580, 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3548580/2c7a564c618bbfb933436be119f0f8cb040bae4b/header.jpg?t=1790879028'],
+    [3513350, 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3513350/fb969539fb0373bd5ee07c767bf9dafa4afae5c3/header.jpg?t=1791864800'],
+  ])('preserves the hashed cover URL returned by Steam for AppID %i', async (appId, headerImageUrl) => {
+    const { steam, store } = setup();
+    steam.overrides.push({ match: 'appdetails', handler: () => Response.json({
+      [appId]: { success: true, data: { type: 'game', header_image: headerImageUrl } },
+    }) });
+    expect(await store.getAppBasics(appId, 'us')).toMatchObject({ headerImageUrl });
+  });
+
+  it('keeps other metadata when Steam has no usable cover', async () => {
+    for (const header of [undefined, null, '', 'not-a-url', 'http://shared.akamai.steamstatic.com/header.jpg', 'https://example.test/header.jpg']) {
+      const { steam, store } = setup();
+      steam.overrides.push({ match: 'appdetails', handler: () => Response.json({
+        20: { success: true, data: { type: 'game', is_free: true, header_image: header } },
+      }) });
+      expect(await store.getAppBasics(20, 'us')).toMatchObject({ available: true, isFree: true, type: 'game', headerImageUrl: null });
+    }
+  });
+});
+
+describe('cover metadata backfill', () => {
+  it.each(['https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/10/asset-hash/header.jpg?t=123', null])(
+    'refreshes old metadata once and uses the result in the library (%s)', async (headerImageUrl) => {
+      const { steam, store } = setup();
+      const now = new Date();
+      const metadata = new Map<number, AppMetadataDoc>([[10, {
+        appId: 10, type: 'game', isFree: false, name: 'Game', storeStatus: 'ok', fetchedAt: now,
+      }]]);
+      const prices = new Map<number, AppPriceDoc>([[10, {
+        appId: 10, region: 'us', status: 'priced', currency: 'USD', initialMinor: 1999, finalMinor: 1999, discountPercent: 0, fetchedAt: now,
+      }]]);
+      const cache = {
+        getMetadata: vi.fn(async () => metadata),
+        getPrices: vi.fn(async () => prices),
+        setMetadata: vi.fn(async (docs: AppMetadataDoc[]) => { docs.forEach((doc) => metadata.set(doc.appId, doc)); }),
+        setPrices: vi.fn(),
+      };
+      steam.overrides.push({ match: 'appdetails', handler: () => Response.json({
+        10: { success: true, data: { type: 'game', is_free: false, header_image: headerImageUrl } },
+      }) });
+      const getBasics = vi.spyOn(store, 'getAppBasics');
+      const pricing = new PricingService(store, cache as unknown as AppCacheRepository);
+
+      expect(await pricing.refresh([10], 'us', 1, now)).toEqual({ pricesUpdated: 0, pricesRemaining: 0 });
+      expect(metadata.get(10)?.headerImageUrl).toBe(headerImageUrl);
+      const game = mergeOwnedGame({ appid: 10, name: 'Game', playtime_forever: 60 }, undefined, now);
+      const dto = toListItem({ game, meta: metadata.get(10), price: effectivePrice(metadata.get(10), prices.get(10)), purchase: undefined }, 'us');
+      expect(dto.coverUrl).toBe(headerImageUrl ?? steamCoverUrl(10));
+
+      await pricing.refresh([10], 'us', 1, now);
+      expect(getBasics).toHaveBeenCalledTimes(1);
+      expect(cache.setPrices).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('effectivePrice', () => {

@@ -82,7 +82,7 @@ export class SteamProfileService {
       .map((e) => ({
         appId: e.game.appId,
         name: e.game.name,
-        coverUrl: steamCoverUrl(e.game.appId),
+        coverUrl: steamCoverUrl(e.game.appId, e.meta?.headerImageUrl),
         playtime2WeeksMinutes: e.game.playtime2WeeksMinutes,
         playtimeForeverMinutes: e.game.playtimeForeverMinutes,
       }));
