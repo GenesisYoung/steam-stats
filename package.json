@@ -20,6 +20,7 @@
     "emulators": "firebase emulators:start --project demo-steam-analytics --config firebase/firebase.json",
     "test:emulated": "firebase emulators:exec --only auth,firestore --project demo-steam-analytics --config firebase/firebase.json \"npm run test:emulated -w backend\"",
     "test:all": "npm test && npm run test:emulated",
+    "apphosting:build": "npm run build",
     "start": "node backend/dist/server.js"
   },
   "devDependencies": {

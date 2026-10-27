@@ -10,7 +10,8 @@ runConfig:
   maxInstances: 3
 
 scripts:
-  buildCommand: npm run build
+  # Keep apphosting:build in package.json: a YAML buildCommand makes the
+  # buildpack rewrite package.json and drop npm workspaces before installation.
   runCommand: node backend/dist/server.js
 
 env:
