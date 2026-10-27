@@ -13,6 +13,27 @@ export function securityHeaders(): RequestHandler {
   });
 }
 
+/** Headers for the single-page app when the API also serves the built frontend (App Hosting). */
+export function webSecurityHeaders(): RequestHandler {
+  return helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", 'https://apis.google.com'],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https://*.steamstatic.com', 'https://*.akamaihd.net', 'https://media.steampowered.com'],
+        connectSrc: ["'self'", 'https://*.googleapis.com'],
+        frameSrc: ['https://*.firebaseapp.com'],
+        frameAncestors: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  });
+}
+
 export function corsPolicy(allowedOrigins: string[]): RequestHandler {
   const allowed = new Set(allowedOrigins);
   return cors({

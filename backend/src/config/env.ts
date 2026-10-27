@@ -18,6 +18,8 @@ const envSchema = z.object({
     .default('')
     .transform((s) => s.split(',').map((o) => o.trim()).filter(Boolean)),
   FIREBASE_PROJECT_ID: z.string().min(1),
+  /** Directory of the built frontend to serve from this server (App Hosting). Unset = API only. */
+  FRONTEND_DIST: z.string().optional(),
   STEAM_API_KEY: z.string().regex(/^[A-F0-9]{32}$/i, 'STEAM_API_KEY must be a 32-character hex key'),
   REQUIRE_EMAIL_VERIFIED: bool.default(true),
   CRON_SECRET: z
@@ -30,8 +32,18 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
+/** Firebase App Hosting / Cloud Run provide the project via FIREBASE_CONFIG or GOOGLE_CLOUD_PROJECT. */
+function defaultProjectId(source: NodeJS.ProcessEnv): string | undefined {
+  try {
+    const fromConfig = source.FIREBASE_CONFIG ? (JSON.parse(source.FIREBASE_CONFIG) as { projectId?: string }).projectId : undefined;
+    return fromConfig ?? source.GOOGLE_CLOUD_PROJECT;
+  } catch {
+    return source.GOOGLE_CLOUD_PROJECT;
+  }
+}
+
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
-  const parsed = envSchema.safeParse(source);
+  const parsed = envSchema.safeParse({ ...source, FIREBASE_PROJECT_ID: source.FIREBASE_PROJECT_ID || defaultProjectId(source) });
   if (!parsed.success) {
     const problems = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
     throw new Error(`Invalid environment configuration:\n${problems}`);

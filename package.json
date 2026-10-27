@@ -9,7 +9,7 @@
     "frontend"
   ],
   "engines": {
-    "node": ">=22"
+    "node": "^22.22.2 || ^24.15.0"
   },
   "scripts": {
     "dev:backend": "npm run dev -w backend",
@@ -19,7 +19,8 @@
     "build": "npm run build -w backend && npm run build -w frontend",
     "emulators": "firebase emulators:start --project demo-steam-analytics --config firebase/firebase.json",
     "test:emulated": "firebase emulators:exec --only auth,firestore --project demo-steam-analytics --config firebase/firebase.json \"npm run test:emulated -w backend\"",
-    "test:all": "npm test && npm run test:emulated"
+    "test:all": "npm test && npm run test:emulated",
+    "start": "node backend/dist/server.js"
   },
   "devDependencies": {
     "firebase-tools": "^15.34.1",

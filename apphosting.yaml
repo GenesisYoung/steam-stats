@@ -1,0 +1,48 @@
+# Firebase App Hosting configuration (https://firebase.google.com/docs/app-hosting/configure)
+# One Node.js server serves both the API (/api) and the built Vue app, so the
+# Steam linking cookie and API calls are same-origin.
+
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+  concurrency: 80
+  minInstances: 0
+  maxInstances: 3
+
+scripts:
+  buildCommand: npm run build
+  runCommand: node backend/dist/server.js
+
+env:
+  # NODE_ENV must stay runtime-only: at build time devDependencies (vite, tsup) are needed.
+  - variable: NODE_ENV
+    value: production
+    availability: [RUNTIME]
+  - variable: FRONTEND_DIST
+    value: frontend/dist
+    availability: [RUNTIME]
+  # Your App Hosting domain (and custom domain, if you add one later).
+  - variable: PUBLIC_APP_URL
+    value: https://steam-stats--steam-stats-b4dd8.us-east4.hosted.app
+    availability: [RUNTIME]
+  - variable: PUBLIC_API_URL
+    value: https://steam-stats--steam-stats-b4dd8.us-east4.hosted.app
+    availability: [RUNTIME]
+  - variable: TRUST_PROXY
+    value: "1"
+    availability: [RUNTIME]
+  - variable: REQUIRE_EMAIL_VERIFIED
+    value: "true"
+    availability: [RUNTIME]
+  # FIREBASE_PROJECT_ID is read from FIREBASE_CONFIG, and the web SDK config from
+  # FIREBASE_WEBAPP_CONFIG; App Hosting provides both automatically.
+
+  # Secrets live in Cloud Secret Manager. Create them once with:
+  #   npx firebase apphosting:secrets:set steam-api-key --project steam-stats-b4dd8
+  #   npx firebase apphosting:secrets:set cron-secret --project steam-stats-b4dd8
+  - variable: STEAM_API_KEY
+    secret: steam-api-key
+    availability: [RUNTIME]
+  - variable: CRON_SECRET
+    secret: cron-secret
+    availability: [RUNTIME]

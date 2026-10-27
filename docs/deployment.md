@@ -146,6 +146,37 @@ npm run build            # backend/dist（tsup 打包）+ frontend/dist（vue-ts
 
 ## 11. 部署
 
+有两种部署方式，任选其一：
+
+- **方式 A：Firebase App Hosting（推荐，推送 GitHub 即自动部署）**：一个 Node 服务器同时提供 `/api` 与前端页面，见 11.0。
+- **方式 B：Cloud Run + Firebase Hosting（手动部署）**：见 11.1–11.2。
+
+### 11.0 Firebase App Hosting（GitHub 自动部署）
+
+仓库根目录的 `apphosting.yaml` 已配置好构建与启动：
+
+- 构建：`npm run build`（后端 tsup + 前端 vite）
+- 启动：`node backend/dist/server.js`，并通过 `FRONTEND_DIST=frontend/dist` 让同一个服务器提供前端页面
+- Firebase Web 配置（`FIREBASE_WEBAPP_CONFIG`）与项目 ID（`FIREBASE_CONFIG`）由 App Hosting 自动注入，无需手动填写 `VITE_FIREBASE_*`
+
+首次配置步骤：
+
+1. **创建机密**（只需一次，会提示输入值并自动授权给 App Hosting 后端）：
+
+   ```bash
+   npx firebase apphosting:secrets:set steam-api-key --project <projectId>
+   npx firebase apphosting:secrets:set cron-secret --project <projectId>
+   ```
+
+   `cron-secret` 至少 32 个字符，可用 `openssl rand -hex 32` 生成。
+
+2. **核对域名**：`apphosting.yaml` 中 `PUBLIC_APP_URL` / `PUBLIC_API_URL` 必须与 App Hosting 后端的域名完全一致（控制台 App Hosting → Backend → Domains）。绑定自定义域名后同步修改。
+3. **授权域名**：Authentication → 设置 → 已获授权的网域，添加 `*.hosted.app` 中你的后端域名。
+4. **部署规则与索引**：同第 3 步（App Hosting 不会自动部署 Firestore 规则）。
+5. 提交并推送到 `main`，App Hosting 会自动开始新的 rollout。
+
+注意：App Hosting 的实例在没有请求时会限制 CPU。手动同步在返回 202 后于后台运行，前端每 3 秒轮询同步状态，这通常能让任务继续推进；如遇大型游戏库同步长时间停滞，可改用 11.3 的定时同步（定时调用会在请求内同步完成）或方式 B 的 `--no-cpu-throttling`。
+
 ### 11.1 后端 → Cloud Run
 
 ```bash
