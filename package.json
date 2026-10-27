@@ -16,7 +16,7 @@
     "dev:frontend": "npm run dev -w frontend",
     "typecheck": "npm run typecheck -w shared && npm run typecheck -w backend && npm run typecheck -w frontend",
     "test": "npm test -w shared && npm test -w backend && npm test -w frontend",
-    "build": "npm run build -w backend && npm run build -w frontend",
+    "build": "npm run build --prefix backend && npm run build --prefix frontend",
     "emulators": "firebase emulators:start --project demo-steam-analytics --config firebase/firebase.json",
     "test:emulated": "firebase emulators:exec --only auth,firestore --project demo-steam-analytics --config firebase/firebase.json \"npm run test:emulated -w backend\"",
     "test:all": "npm test && npm run test:emulated",
