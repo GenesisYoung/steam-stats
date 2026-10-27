@@ -1,0 +1,46 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "preferences.autoSync", "order": "ASCENDING" },
+        { "fieldPath": "lastSuccessfulSyncAt", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "linkSessions",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "openidNonces",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "playtimeSnapshots",
+      "fieldPath": "games",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "achievements",
+      "fieldPath": "unlocked",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "schemas",
+      "fieldPath": "achievements",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "schemas",
+      "fieldPath": "globalPercentages",
+      "indexes": []
+    }
+  ]
+}

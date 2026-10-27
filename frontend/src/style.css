@@ -1,0 +1,119 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Design tokens. Dark (Steam-inspired) is the default; .light overrides. */
+:root,
+.dark {
+  --bg: #0b1118;
+  --bg-elevated: #111a24;
+  --surface: #16212e;
+  --surface-2: #1c2a3a;
+  --border: #263445;
+  --text: #e6edf3;
+  --text-muted: #8fa3b8;
+  --accent: #66c0f4;
+  --accent-strong: #1a9fff;
+  --accent-contrast: #06121c;
+  --success: #5ec269;
+  --warning: #e5b454;
+  --danger: #ef6a6a;
+}
+
+.light {
+  --bg: #f3f6f9;
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #eef2f6;
+  --border: #d5dde6;
+  --text: #13202c;
+  --text-muted: #566a7f;
+  --accent: #1a73c9;
+  --accent-strong: #135ea6;
+  --accent-contrast: #ffffff;
+  --success: #2f8f3b;
+  --warning: #a8740f;
+  --danger: #c43a3a;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-fg: var(--text);
+  --color-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+html {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%),
+    var(--bg);
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-line bg-surface p-5 shadow-sm shadow-black/10;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-accent-strong text-white hover:bg-accent hover:text-accent-contrast;
+  }
+  .btn-secondary {
+    @apply border border-line bg-surface-2 text-fg hover:border-accent/60;
+  }
+  .btn-danger {
+    @apply bg-danger/90 text-white hover:bg-danger;
+  }
+  .btn-ghost {
+    @apply text-muted hover:bg-surface-2 hover:text-fg;
+  }
+  .input {
+    @apply w-full rounded-lg border border-line bg-bg-elevated px-3 py-2 text-sm text-fg placeholder:text-muted/70 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-muted;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+  .section-title {
+    @apply text-lg font-semibold tracking-tight text-fg;
+  }
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

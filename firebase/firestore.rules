@@ -1,0 +1,121 @@
+rules_version = '2';
+
+// Steam Analytics Dashboard — Firestore Security Rules
+//
+// Principles:
+//  * A signed-in user can only ever read their own documents.
+//  * Trusted Steam data (profile, games, achievements, snapshots, sync jobs)
+//    is written exclusively by the backend through the Admin SDK, which
+//    bypasses these rules. Clients can never write it.
+//  * Clients may change only displayName / preferences on their own user doc
+//    and their own user-entered purchase records, with strict validation.
+//  * Server-internal collections (steamLinks, linkSessions, openidNonces) are
+//    never accessible to clients. Shared Steam app data is read-only.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function validPreferences(p) {
+      return p is map
+        && p.keys().hasOnly(['currency', 'language', 'storeRegion', 'theme', 'autoSync'])
+        && p.keys().hasAll(['currency', 'language', 'storeRegion', 'theme', 'autoSync'])
+        && p.currency is string && p.currency.matches('^[A-Z]{3}$')
+        && p.language in ['en', 'zh-CN']
+        && p.storeRegion is string && p.storeRegion.matches('^[a-z]{2}$')
+        && p.theme in ['dark', 'light', 'system']
+        && p.autoSync is bool;
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      // Creation is performed by the backend (GET /api/me).
+      allow create, delete: if false;
+      allow update: if isOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'preferences'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.displayName.size() <= 50
+        && validPreferences(request.resource.data.preferences);
+
+      // Trusted Steam data: owner read-only.
+      match /steamProfile/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+      match /games/{appId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+        match /achievements/{docId} {
+          allow read: if isOwner(uid);
+          allow write: if false;
+        }
+      }
+      match /playtimeSnapshots/{snapshotId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+      match /syncJobs/{jobId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      // User-entered purchase records (never verified).
+      match /gamePurchases/{appId} {
+        function validPurchase() {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['appId', 'amount', 'currency', 'purchaseDate', 'source', 'notes', 'createdAt', 'updatedAt'])
+            && d.keys().hasAll(['appId', 'amount', 'currency', 'purchaseDate', 'source', 'notes', 'createdAt', 'updatedAt'])
+            && d.appId is int && string(d.appId) == appId
+            && (d.amount is int || d.amount is float) && d.amount >= 0 && d.amount <= 100000
+            && d.currency is string && d.currency.matches('^[A-Z]{3}$')
+            && (d.purchaseDate == null || (d.purchaseDate is string && d.purchaseDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
+            && d.source in ['steam', 'steam_gift', 'bundle', 'key_store', 'retail', 'subscription', 'free', 'other']
+            && d.notes is string && d.notes.size() <= 500
+            && d.createdAt is timestamp && d.updatedAt is timestamp
+            && d.updatedAt == request.time;
+        }
+        // The purchase must refer to a game in the user's synced library.
+        function ownsGame() {
+          return exists(/databases/$(database)/documents/users/$(uid)/games/$(appId));
+        }
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && validPurchase() && ownsGame() && request.resource.data.createdAt == request.time;
+        allow update: if isOwner(uid) && validPurchase() && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    // SteamID -> UID uniqueness mapping and linking internals: server only.
+    match /steamLinks/{steamId} {
+      allow read, write: if false;
+    }
+    match /linkSessions/{sessionId} {
+      allow read, write: if false;
+    }
+    match /openidNonces/{nonceId} {
+      allow read, write: if false;
+    }
+
+    // Shared Steam app metadata, prices and achievement schemas: read-only for signed-in users.
+    match /steamApps/{appId} {
+      allow read: if signedIn();
+      allow write: if false;
+      match /{subcollection}/{docId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+    }
+
+    // Deny everything else.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
