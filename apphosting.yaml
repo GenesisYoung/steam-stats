@@ -34,14 +34,7 @@ env:
   - variable: REQUIRE_EMAIL_VERIFIED
     value: "true"
     availability: [ RUNTIME ]
-  # FIREBASE_PROJECT_ID is read from FIREBASE_CONFIG, and the web SDK config from
-  # FIREBASE_WEBAPP_CONFIG; App Hosting provides both automatically.
-
-  # Secrets live in Cloud Secret Manager. Create them once with:
-  #   npx firebase apphosting:secrets:set steam-api-key --project steam-stats-b4dd8
-  #   npx firebase apphosting:secrets:set cron-secret --project steam-stats-b4dd8
   - variable: STEAM_API_KEY
     secret: steam-api-key
-    availability: [ RUNTIME ]
   - variable: CRON_SECRET
     secret: cron-secret
