@@ -68,3 +68,72 @@ export const syncRequestSchema = z.object({ scope: z.enum(['profile', 'full']).d
 export const analyticsQuerySchema = z.object({
   basis: z.enum(['estimated', 'actual']).default('estimated'),
 });
+
+const money = z
+  .number()
+  .min(0)
+  .max(100_000)
+  .refine((n) => Math.abs(n * 100 - Math.round(n * 100)) < 1e-6, 'At most 2 decimals');
+
+const optionalPastDate = isoDate
+  .refine((s) => Date.parse(`${s}T00:00:00Z`) <= Date.now() + 86_400_000, 'Date is in the future')
+  .nullable()
+  .default(null);
+
+/** Several games bought together for one price. */
+export const bundleInputSchema = z
+  .object({
+    appIds: z.array(appIdSchema).min(2).max(100),
+    total: money,
+    currency: z.enum(CURRENCIES),
+    purchaseDate: optionalPastDate,
+    source: z.enum(PURCHASE_SOURCES).default('bundle'),
+    notes: z.string().trim().max(500).default(''),
+    allocation: z.enum(['store_price', 'even', 'manual']).default('store_price'),
+    /** Required for allocation "manual": one share per appId, adding up to total. */
+    shares: z.array(z.object({ appId: appIdSchema, amount: money })).optional(),
+    /** Overwrite existing single-game records for these games. */
+    replaceExisting: z.boolean().default(false),
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    if (new Set(v.appIds).size !== v.appIds.length) ctx.addIssue({ code: 'custom', path: ['appIds'], message: 'Duplicate games' });
+    if (v.allocation !== 'manual') return;
+    if (!v.shares) {
+      ctx.addIssue({ code: 'custom', path: ['shares'], message: 'Shares are required for manual allocation' });
+      return;
+    }
+    const ids = new Set(v.shares.map((s) => s.appId));
+    if (ids.size !== v.appIds.length || !v.appIds.every((id) => ids.has(id))) {
+      ctx.addIssue({ code: 'custom', path: ['shares'], message: 'One share per game is required' });
+    }
+    const sum = v.shares.reduce((a, s) => a + Math.round(s.amount * 100), 0);
+    if (sum !== Math.round(v.total * 100)) ctx.addIssue({ code: 'custom', path: ['shares'], message: 'Shares must add up to the total' });
+  });
+export type BundleInput = z.infer<typeof bundleInputSchema>;
+
+export const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
+export const IMPORT_MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const;
+
+/** Reviewed transactions to save after a screenshot import. */
+export const importCommitSchema = z
+  .object({
+    transactions: z
+      .array(
+        z
+          .object({
+            appIds: z.array(appIdSchema).min(1).max(100),
+            total: money,
+            currency: z.enum(CURRENCIES),
+            purchaseDate: optionalPastDate,
+            source: z.enum(PURCHASE_SOURCES).default('steam'),
+            notes: z.string().trim().max(500).default(''),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(200),
+    replaceExisting: z.boolean().default(false),
+  })
+  .strict();
+export type ImportCommitInput = z.infer<typeof importCommitSchema>;

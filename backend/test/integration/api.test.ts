@@ -358,6 +358,129 @@ d('backend integration (emulators + fake Steam)', () => {
     });
   });
 
+  // ---------- Bundles & screenshot import ----------
+
+  describe('bundles', () => {
+    it('splits a bundle by store price and counts it as one transaction', async () => {
+      const user = await linkedUser();
+      // 100 = $59.99, 200 = $19.99 in the fake store
+      const res = await h.http().post('/api/purchases/bundles').set('Authorization', user.bearer)
+        .send({ appIds: [100, 200], total: 40, currency: 'USD', purchaseDate: '2025-06-01' }).expect(201);
+      expect(res.body.data).toMatchObject({ total: 40, allocation: 'store_price', items: [{ appId: 100, amount: 30 }, { appId: 200, amount: 10 }] });
+      const bundleId = res.body.data.id;
+
+      const detail = await h.http().get('/api/steam/games/100').set('Authorization', user.bearer).expect(200);
+      expect(detail.body.data.purchaseRecord).toMatchObject({ amount: 30, bundle: { id: bundleId, total: 40, itemCount: 2 } });
+
+      const value = await h.http().get('/api/analytics/library-value').set('Authorization', user.bearer).expect(200);
+      expect(value.body.data.recorded).toMatchObject({ totals: [{ currency: 'USD', amount: 40, count: 2 }], purchaseCount: 1, bundleCount: 1 });
+    });
+
+    it('falls back to an even split when a game has no store price', async () => {
+      const user = await linkedUser();
+      const res = await h.http().post('/api/purchases/bundles').set('Authorization', user.bearer)
+        .send({ appIds: [100, 400], total: 10, currency: 'USD' }).expect(201);
+      expect(res.body.data.allocation).toBe('even');
+      expect(res.body.data.items.map((i: { amount: number }) => i.amount)).toEqual([5, 5]);
+    });
+
+    it('protects bundled games from single-game edits and conflicting bundles', async () => {
+      const user = await linkedUser();
+      const res = await h.http().post('/api/purchases/bundles').set('Authorization', user.bearer)
+        .send({ appIds: [100, 200], total: 40, currency: 'USD' }).expect(201);
+      const id = res.body.data.id;
+      expect((await h.http().put('/api/purchases/100').set('Authorization', user.bearer).send({ amount: 1, currency: 'USD' }).expect(409)).body.error.code).toBe('PURCHASE_CONFLICT');
+      await h.http().delete('/api/purchases/100').set('Authorization', user.bearer).expect(409);
+      const conflict = await h.http().post('/api/purchases/bundles').set('Authorization', user.bearer).send({ appIds: [200, 300], total: 5, currency: 'USD' }).expect(409);
+      expect(conflict.body.error.details.appIds).toEqual([200]);
+
+      // Manual shares, and dropping a game from the bundle
+      const updated = await h.http().put(`/api/purchases/bundles/${id}`).set('Authorization', user.bearer)
+        .send({ appIds: [100, 300], total: 12, currency: 'USD', allocation: 'manual', shares: [{ appId: 100, amount: 10 }, { appId: 300, amount: 2 }] }).expect(200);
+      expect(updated.body.data.items).toEqual([{ appId: 100, name: 'Paid Played', amount: 10 }, { appId: 300, name: 'Free Game', amount: 2 }]);
+      expect((await h.db.doc(`users/${user.uid}/gamePurchases/200`).get()).exists).toBe(false);
+
+      await h.http().delete(`/api/purchases/bundles/${id}`).set('Authorization', user.bearer).expect(204);
+      expect((await h.http().get('/api/purchases').set('Authorization', user.bearer)).body.data).toEqual([]);
+    });
+
+    it('validates bundle input', async () => {
+      const user = await linkedUser();
+      await h.http().post('/api/purchases/bundles').set('Authorization', user.bearer).send({ appIds: [100], total: 5, currency: 'USD' }).expect(400);
+      await h.http().post('/api/purchases/bundles').set('Authorization', user.bearer).send({ appIds: [100, 999], total: 5, currency: 'USD' }).expect(404);
+      await h.http().get('/api/purchases/bundles/not-a-bundle').set('Authorization', user.bearer).expect(400);
+    });
+  });
+
+  describe('screenshot import', () => {
+    const png = Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.alloc(64)]);
+
+    it('previews rows, matches games and flags non-game items', async () => {
+      const user = await linkedUser();
+      await h.http().put('/api/purchases/300').set('Authorization', user.bearer).send({ amount: 0, currency: 'USD' }).expect(200);
+      h.reader.next = {
+        is_purchase_history: true,
+        rows: [
+          { date: '2025-03-01', items: ['Paid Played', 'Paid Unplayed', 'Paid Played Soundtrack'], type: 'purchase', total: 50, currency: 'usd' },
+          { date: '2025-02-01', items: ['Free Game'], type: 'purchase', total: 0, currency: 'USD' },
+          { date: 'yesterday', items: ['$20.00 Wallet Credit'], type: 'wallet_credit', total: 20, currency: '¥' },
+          { date: null, items: ['Unknown Indie'], type: 'gift_purchase', total: null, currency: null },
+        ],
+      };
+      const res = await h.http().post('/api/purchases/import/screenshot').set('Authorization', user.bearer).set('Content-Type', 'image/png').send(png).expect(200);
+      const [bundle, free, wallet, unknown] = res.body.data.transactions;
+      expect(bundle).toMatchObject({ date: '2025-03-01', currency: 'USD', total: 50 });
+      expect(bundle.items.map((i: { kind: string; appId: number | null }) => [i.kind, i.appId])).toEqual([['game', 100], ['game', 200], ['non_game', null]]);
+      expect(free.items[0]).toMatchObject({ kind: 'game', appId: 300, alreadyRecorded: true });
+      expect(wallet).toMatchObject({ date: null, currency: null, items: [{ kind: 'non_game', reason: 'wallet_credit' }] });
+      expect(unknown.items[0]).toMatchObject({ kind: 'unmatched' });
+    });
+
+    it('rejects files that are not images', async () => {
+      const user = await linkedUser();
+      const calls = h.reader.calls;
+      await h.http().post('/api/purchases/import/screenshot').set('Authorization', user.bearer).set('Content-Type', 'image/png').send(Buffer.from('<svg>not really a png</svg>')).expect(422);
+      await h.http().post('/api/purchases/import/screenshot').set('Authorization', user.bearer).set('Content-Type', 'text/plain').send('hello').expect(422);
+      expect(h.reader.calls).toBe(calls);
+    });
+
+    it('commits reviewed transactions as purchases and bundles', async () => {
+      const user = await linkedUser();
+      await h.http().put('/api/purchases/300').set('Authorization', user.bearer).send({ amount: 1, currency: 'USD' }).expect(200);
+      const res = await h.http().post('/api/purchases/import/commit').set('Authorization', user.bearer).send({
+        transactions: [
+          { appIds: [100, 200], total: 45, currency: 'USD', purchaseDate: '2025-03-01' },
+          { appIds: [300], total: 0, currency: 'USD' },
+          { appIds: [400], total: 7.5, currency: 'EUR', source: 'steam_gift' },
+        ],
+      }).expect(201);
+      expect(res.body.data).toEqual({ created: 3, bundlesCreated: 1, skipped: 1 });
+      const list = (await h.http().get('/api/purchases').set('Authorization', user.bearer)).body.data;
+      const byId = Object.fromEntries(list.map((p: { appId: number }) => [p.appId, p]));
+      expect(byId[100]).toMatchObject({ origin: 'screenshot_import', bundle: { total: 45, itemCount: 2 } });
+      expect(byId[300]).toMatchObject({ amount: 1, origin: 'manual' });
+      expect(byId[400]).toMatchObject({ amount: 7.5, currency: 'EUR', source: 'steam_gift', bundle: null });
+
+      await h.http().post('/api/purchases/import/commit').set('Authorization', user.bearer)
+        .send({ transactions: [{ appIds: [100], total: 1, currency: 'USD' }, { appIds: [100], total: 1, currency: 'USD' }] }).expect(409);
+    });
+
+    it('reports when import is not configured', async () => {
+      const user = await linkedUser();
+      const disabled = createHarness();
+      const status = await disabled.http().get('/api/purchases/import').set('Authorization', user.bearer).expect(200);
+      expect(status.body.data.available).toBe(true);
+      // A container without a reader answers 503.
+      const { createContainer } = await import('../../src/container');
+      const { createApp } = await import('../../src/app');
+      const off = createApp(createContainer({ env: disabled.env, db: disabled.db, auth: disabled.auth, fetchImpl: disabled.steam.fetch, screenshotReader: null }));
+      const request = (await import('supertest')).default;
+      expect((await request(off).get('/api/purchases/import').set('Authorization', user.bearer)).body.data.available).toBe(false);
+      const res = await request(off).post('/api/purchases/import/screenshot').set('Authorization', user.bearer).set('Content-Type', 'image/png').send(png).expect(503);
+      expect(res.body.error.code).toBe('IMPORT_UNAVAILABLE');
+    });
+  });
+
   // ---------- Account deletion ----------
 
   describe('account deletion', () => {

@@ -18,6 +18,8 @@ import { PricingService } from './services/pricingService';
 import { SyncService } from './services/syncService';
 import { AnalyticsService } from './services/analyticsService';
 import { AccountService } from './services/accountService';
+import { PurchaseService } from './services/purchaseService';
+import { ClaudeScreenshotReader, ImportService, type ScreenshotReader } from './services/importService';
 import type { TokenBucket } from './lib/http';
 
 export interface ContainerDeps {
@@ -28,9 +30,11 @@ export interface ContainerDeps {
   fetchImpl?: FetchLike;
   limiters?: { web?: TokenBucket; store?: TokenBucket };
   retries?: number;
+  /** Injected in tests instead of calling Claude. */
+  screenshotReader?: ScreenshotReader | null;
 }
 
-export function createContainer({ env, db, auth, fetchImpl, limiters, retries }: ContainerDeps) {
+export function createContainer({ env, db, auth, fetchImpl, limiters, retries, screenshotReader }: ContainerDeps) {
   const refs = createRefs(db);
   const users = new UserRepository(refs);
   const steamData = new SteamDataRepository(refs);
@@ -52,8 +56,12 @@ export function createContainer({ env, db, auth, fetchImpl, limiters, retries }:
   });
   const analytics = new AnalyticsService(library, steamData);
   const account = new AccountService(refs, users, auth);
+  const purchaseService = new PurchaseService(purchases, library, users);
+  const reader =
+    screenshotReader !== undefined ? screenshotReader : env.ANTHROPIC_API_KEY ? new ClaudeScreenshotReader(env.ANTHROPIC_API_KEY, env.IMPORT_MODEL) : null;
+  const imports = new ImportService(reader, library, purchases);
 
-  return { env, auth, refs, users, steamData, purchases, appCache, library, profiles, links, achievements, pricing, sync, analytics, account };
+  return { env, auth, refs, users, steamData, purchases, appCache, library, profiles, links, achievements, pricing, sync, analytics, account, purchaseService, imports };
 }
 
 export type Container = ReturnType<typeof createContainer>;

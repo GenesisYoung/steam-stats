@@ -10,6 +10,17 @@ import { createContainer } from '../../src/container';
 import { createApp } from '../../src/app';
 import { TokenBucket } from '../../src/lib/http';
 import { FakeSteam } from './fakeSteam';
+import type { ExtractedHistory, ScreenshotReader } from '../../src/services/importService';
+
+/** Stands in for Claude: returns whatever `next` holds. */
+export class FakeScreenshotReader implements ScreenshotReader {
+  next: ExtractedHistory = { is_purchase_history: true, rows: [] };
+  calls = 0;
+  async read() {
+    this.calls += 1;
+    return this.next;
+  }
+}
 
 export const PROJECT_ID = 'demo-steam-analytics';
 const FIRESTORE = process.env.FIRESTORE_EMULATOR_HOST;
@@ -30,12 +41,13 @@ export function createHarness(overrides: Record<string, string> = {}) {
   });
   const { db, auth } = initFirebase(PROJECT_ID);
   const steam = new FakeSteam();
+  const reader = new FakeScreenshotReader();
   const container = createContainer({
-    env, db, auth, fetchImpl: steam.fetch, retries: 1,
+    env, db, auth, fetchImpl: steam.fetch, retries: 1, screenshotReader: reader,
     limiters: { web: new TokenBucket(10_000, 10_000), store: new TokenBucket(10_000, 10_000) },
   });
   const app = createApp(container);
-  return { env, db, auth, steam, container, app, http: () => request(app) };
+  return { env, db, auth, steam, reader, container, app, http: () => request(app) };
 }
 
 export async function resetEmulators() {

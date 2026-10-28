@@ -39,3 +39,10 @@ env:
     secret: steam-api-key
   - variable: CRON_SECRET
     secret: cron-secret
+
+  # Optional: purchase import from screenshots (Claude vision). Create the secret
+  # first, then uncomment; a missing secret makes the rollout fail.
+  #   npx firebase apphosting:secrets:set anthropic-api-key --project steam-stats-b4dd8
+  # - variable: ANTHROPIC_API_KEY
+  #   secret: anthropic-api-key
+  #   availability: [ RUNTIME ]

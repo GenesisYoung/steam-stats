@@ -27,6 +27,10 @@ export const errors = {
   steamUnavailable: (msg = 'Steam is temporarily unavailable') => new AppError(502, 'STEAM_UNAVAILABLE', msg),
   syncInProgress: (jobId: string) =>
     new AppError(409, 'SYNC_IN_PROGRESS', 'A synchronization is already running', { jobId }),
+  purchaseConflict: (msg: string, appIds: number[]) => new AppError(409, 'PURCHASE_CONFLICT', msg, { appIds }),
+  importUnavailable: () =>
+    new AppError(503, 'IMPORT_UNAVAILABLE', 'Screenshot import is not configured on this server'),
+  importFailed: (msg = 'The screenshot could not be read') => new AppError(422, 'IMPORT_FAILED', msg),
   rateLimited: (msg = 'Too many requests', retryAfterSeconds?: number) =>
     new AppError(429, 'RATE_LIMITED', msg, retryAfterSeconds ? { retryAfterSeconds } : undefined),
 };

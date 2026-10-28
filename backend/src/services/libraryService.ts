@@ -11,6 +11,7 @@ import type { PurchaseRepository } from '../repositories/purchaseRepository';
 import type { SteamDataRepository } from '../repositories/steamDataRepository';
 import type { UserRepository } from '../repositories/userRepository';
 import { effectivePrice, toPriceDto, type EffectivePrice } from './pricingService';
+import { toPurchaseDto } from './purchaseService';
 
 export interface LibraryEntry {
   game: OwnedGameDoc;
@@ -164,9 +165,7 @@ export class LibraryService {
     return {
       ...toListItem(entry, lib.region),
       storeType: entry.meta?.type ?? null,
-      purchaseRecord: entry.purchase
-        ? { ...entry.purchase, createdAt: entry.purchase.createdAt.toISOString(), updatedAt: entry.purchase.updatedAt.toISOString(), userEntered: true }
-        : null,
+      purchaseRecord: entry.purchase ? toPurchaseDto(entry.purchase, entry.game.name) : null,
       storeUrl: `https://store.steampowered.com/app/${appId}/`,
     };
   }

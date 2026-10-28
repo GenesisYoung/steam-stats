@@ -135,6 +135,36 @@ Steam 回调。校验后 `303` 跳转到：
 - 游戏必须在用户已同步的游戏库中，否则 `404`。
 
 ### `DELETE /purchases/:appid` → `204`
+属于捆绑包的游戏不能单独修改或删除（`409 PURCHASE_CONFLICT`），请通过捆绑包接口操作。
+
+### 捆绑包（多款游戏一起购买）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/purchases/bundles` | 创建，返回 `201 BundleDto` |
+| GET | `/purchases/bundles/:id` | 详情（含每款游戏的分摊金额） |
+| PUT | `/purchases/bundles/:id` | 整体替换（可增删游戏、修改总价与分摊方式） |
+| DELETE | `/purchases/bundles/:id` | 删除捆绑包及其所有游戏记录 |
+
+```json
+{ "appIds": [620, 413150], "total": 15, "currency": "USD", "purchaseDate": "2024-11-28",
+  "source": "bundle", "notes": "", "allocation": "store_price", "replaceExisting": false }
+```
+
+- `allocation`：`store_price`（按当前商店价格比例；任一游戏价格未知时自动改为平均）、`even`（平均）、`manual`（需提供 `shares: [{ appId, amount }]`，合计必须等于 `total`）。
+- 分摊精确到分，余数分给小数部分最大的游戏，保证合计等于总价。
+- 每款游戏的 `gamePurchases/{appid}` 文档保存其分摊金额，并带 `bundle: { id, total, itemCount, allocation }`；统计"已记录花费"时捆绑包只计一次交易。
+- 已有单独记录的游戏默认冲突（`409`，`details.appIds`），设 `replaceExisting: true` 可覆盖。
+
+### 截图导入
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/purchases/import` | `{ available, maxBytes }`，未配置 `ANTHROPIC_API_KEY` 时 `available: false` |
+| POST | `/purchases/import/screenshot` | 请求体为图片原始字节（`Content-Type: image/png` 等，≤5 MB，按文件头校验格式），返回 `ImportPreviewDto`，**不保存任何数据**；每用户每小时 20 次 |
+| POST | `/purchases/import/commit` | 保存用户核对后的交易：一款游戏 = 单独记录，多款 = 捆绑包（按商店价格分摊） |
+
+预览中每个条目带 `kind`：`game`（已匹配游戏库）、`non_game`（DLC、原声、软件、钱包充值、市场、游戏内购买、退款；`reason` 说明原因）、`unmatched`（不在游戏库中）。截图由 Claude（`IMPORT_MODEL`，默认 `claude-opus-5-5`）以结构化输出识别，图片不落盘。
 
 ---
 

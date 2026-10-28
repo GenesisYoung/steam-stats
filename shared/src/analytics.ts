@@ -245,3 +245,24 @@ export function snapshotDeltas(snapshots: SnapshotPoint[]) {
     monthly: [...monthlyMap.entries()].map(([month, minutes]) => ({ month, minutes })),
   };
 }
+
+/**
+ * Split a bundle total into per-game shares (2-decimal amounts that add up
+ * exactly to the total). Weights are each game's store price; when any weight
+ * is unknown or zero the total is split evenly. Leftover cents go to the
+ * largest fractional remainders.
+ */
+export function allocateBundle(total: number, weights: (number | null | undefined)[]): { amounts: number[]; method: 'store_price' | 'even' } {
+  const n = weights.length;
+  if (n === 0) return { amounts: [], method: 'even' };
+  const totalCents = Math.round(total * 100);
+  const usePrice = weights.every((w) => typeof w === 'number' && w > 0);
+  const w = usePrice ? (weights as number[]) : weights.map(() => 1);
+  const sum = w.reduce((a, b) => a + b, 0);
+  const raw = w.map((x) => (totalCents * x) / sum);
+  const cents = raw.map(Math.floor);
+  let left = totalCents - cents.reduce((a, b) => a + b, 0);
+  const order = raw.map((r, i) => ({ i, frac: r - Math.floor(r) })).sort((a, b) => b.frac - a.frac || a.i - b.i);
+  for (let k = 0; left > 0; k = (k + 1) % n, left--) cents[order[k]!.i]! += 1;
+  return { amounts: cents.map((c) => c / 100), method: usePrice ? 'store_price' : 'even' };
+}

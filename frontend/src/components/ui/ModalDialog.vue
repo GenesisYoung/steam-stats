@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 
-const props = defineProps<{ open: boolean; title: string }>();
+const props = defineProps<{ open: boolean; title: string; wide?: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 const dialog = ref<HTMLDialogElement | null>(null);
 
@@ -18,7 +18,8 @@ watch(
 <template>
   <dialog
     ref="dialog"
-    class="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-line bg-surface p-0 text-fg backdrop:bg-black/60"
+    :class="wide ? 'w-[min(44rem,calc(100vw-2rem))]' : 'w-[min(32rem,calc(100vw-2rem))]'"
+    class="m-auto rounded-xl border border-line bg-surface p-0 text-fg backdrop:bg-black/60"
     :aria-label="title"
     @close="emit('close')"
     @cancel.prevent="emit('close')"

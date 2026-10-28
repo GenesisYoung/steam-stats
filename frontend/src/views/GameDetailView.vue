@@ -5,6 +5,7 @@ import { CURRENCIES, PURCHASE_SOURCES, purchaseInputSchema, type GameAchievement
 import { api } from '@/services/api';
 import { useApi } from '@/composables/useAsync';
 import { useFormat } from '@/composables/useFormat';
+import { localTodayIso } from '@/composables/dates';
 import { useAuthStore } from '@/stores/auth';
 import { useSteamStore } from '@/stores/steam';
 import SteamRequired from '@/components/steam/SteamRequired.vue';
@@ -15,6 +16,8 @@ import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatCard from '@/components/ui/StatCard.vue';
 import DataAsOf from '@/components/ui/DataAsOf.vue';
 import AppIcon from '@/components/ui/AppIcon.vue';
+import DatePicker from '@/components/ui/DatePicker.vue';
+import BundleEditor from '@/components/steam/BundleEditor.vue';
 
 const props = defineProps<{ appId: number }>();
 const f = useFormat();
@@ -43,7 +46,20 @@ const visibleAchievements = computed(() => {
 });
 
 // ---- Purchase (Model B) form ----
-const form = reactive({ amount: '', currency: authStore.me?.preferences.currency ?? 'USD', purchaseDate: '', source: 'steam', notes: '' });
+const form = reactive({ amount: '', currency: authStore.me?.preferences.currency ?? 'USD', purchaseDate: null as string | null, source: 'steam', notes: '' });
+const todayIso = localTodayIso();
+
+// ---- Bundle (several games, one price) ----
+const bundleOpen = ref(false);
+const bundleId = ref<string | null>(null);
+function openBundle(id: string | null) {
+  bundleId.value = id;
+  bundleOpen.value = true;
+}
+async function onBundleSaved() {
+  bundleOpen.value = false;
+  await detail.reload();
+}
 const editing = ref(false);
 const saving = ref(false);
 const formError = ref<string | null>(null);
@@ -54,7 +70,7 @@ watch(
   (p) => {
     form.amount = p ? String(p.amount) : '';
     form.currency = p?.currency ?? authStore.me?.preferences.currency ?? 'USD';
-    form.purchaseDate = p?.purchaseDate ?? '';
+    form.purchaseDate = p?.purchaseDate ?? null;
     form.source = p?.source ?? 'steam';
     form.notes = p?.notes ?? '';
   },
@@ -139,17 +155,28 @@ async function deletePurchase() {
           </div>
           <p class="text-sm text-muted">{{ $t('purchase.description') }}</p>
           <div v-if="detail.data.value.purchaseRecord && !editing" class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-            <span><span class="text-muted">{{ $t('purchase.amount') }}:</span> {{ f.money(detail.data.value.purchaseRecord) }}</span>
+            <p v-if="detail.data.value.purchaseRecord.bundle" class="flex w-full items-center gap-2 rounded-lg bg-accent/10 px-3 py-2 text-accent">
+              <AppIcon name="layers" :size="16" />
+              {{ $t('bundle.partOf', { n: detail.data.value.purchaseRecord.bundle.itemCount, total: f.money({ amount: detail.data.value.purchaseRecord.bundle.total, currency: detail.data.value.purchaseRecord.currency }) }) }}
+              · {{ $t(`bundle.allocation.${detail.data.value.purchaseRecord.bundle.allocation}`) }}
+            </p>
+            <span><span class="text-muted">{{ detail.data.value.purchaseRecord.bundle ? $t('bundle.share') : $t('purchase.amount') }}:</span> {{ f.money(detail.data.value.purchaseRecord) }}</span>
             <span><span class="text-muted">{{ $t('purchase.date') }}:</span> {{ detail.data.value.purchaseRecord.purchaseDate ?? $t('common.notRecorded') }}</span>
             <span><span class="text-muted">{{ $t('purchase.source') }}:</span> {{ $t(`purchase.sources.${detail.data.value.purchaseRecord.source}`) }}</span>
             <span v-if="detail.data.value.purchaseRecord.notes" class="w-full text-muted">“{{ detail.data.value.purchaseRecord.notes }}”</span>
-            <div class="flex gap-2">
+            <div v-if="detail.data.value.purchaseRecord.bundle" class="flex gap-2">
+              <button type="button" class="btn btn-secondary" @click="openBundle(detail.data.value.purchaseRecord.bundle.id)">{{ $t('bundle.edit') }}</button>
+            </div>
+            <div v-else class="flex gap-2">
               <button type="button" class="btn btn-secondary" @click="editing = true">{{ $t('common.edit') }}</button>
               <button type="button" class="btn btn-ghost text-danger" :disabled="saving" @click="deletePurchase">{{ $t('common.delete') }}</button>
             </div>
           </div>
-          <button v-else-if="!editing" type="button" class="btn btn-secondary self-start" @click="editing = true">{{ $t('purchase.add') }}</button>
-          <form v-else class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" @submit.prevent="savePurchase">
+          <div v-else-if="!editing" class="flex flex-wrap gap-2">
+            <button type="button" class="btn btn-secondary" @click="editing = true">{{ $t('purchase.add') }}</button>
+            <button type="button" class="btn btn-ghost" @click="openBundle(null)"><AppIcon name="layers" :size="16" />{{ $t('bundle.recordAsBundle') }}</button>
+          </div>
+          <form v-else class="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_7rem_minmax(11rem,1.3fr)_1fr]" @submit.prevent="savePurchase">
             <label>
               <span class="label">{{ $t('purchase.amount') }}</span>
               <input v-model="form.amount" type="number" min="0" max="100000" step="0.01" inputmode="decimal" required class="input" />
@@ -160,10 +187,10 @@ async function deletePurchase() {
                 <option v-for="c in CURRENCIES" :key="c" :value="c">{{ c }}</option>
               </select>
             </label>
-            <label>
+            <div>
               <span class="label">{{ $t('purchase.date') }}</span>
-              <input v-model="form.purchaseDate" type="date" class="input" />
-            </label>
+              <DatePicker v-model="form.purchaseDate" :max="todayIso" :label="$t('purchase.date')" />
+            </div>
             <label>
               <span class="label">{{ $t('purchase.source') }}</span>
               <select v-model="form.source" class="input">
@@ -182,6 +209,13 @@ async function deletePurchase() {
             </div>
           </form>
         </section>
+        <BundleEditor
+          :open="bundleOpen"
+          :bundle-id="bundleId"
+          :initial-app-ids="bundleId ? undefined : [appId]"
+          @close="bundleOpen = false"
+          @saved="onBundleSaved"
+        />
       </template>
 
       <section class="card flex flex-col gap-4">

@@ -33,6 +33,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'achievements', name: 'achievements', component: () => import('@/views/AchievementsView.vue'), meta: { titleKey: 'nav.achievements' } },
       { path: 'analytics', name: 'analytics', component: () => import('@/views/AnalyticsView.vue'), meta: { titleKey: 'nav.analytics' } },
       { path: 'valuation', name: 'valuation', component: () => import('@/views/ValuationView.vue'), meta: { titleKey: 'nav.valuation' } },
+      { path: 'purchases/import', name: 'import', component: () => import('@/views/ImportView.vue'), meta: { titleKey: 'import.title' } },
       { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue'), meta: { titleKey: 'nav.settings' } },
     ],
   },

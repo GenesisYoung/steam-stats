@@ -12,6 +12,7 @@
     "test:emulated": "vitest run test/integration test/rules"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
     "@steam-analytics/shared": "*",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",

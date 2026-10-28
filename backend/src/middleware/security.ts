@@ -55,5 +55,7 @@ export function limiter(opts: { windowMs: number; limit: number; perUser?: boole
     legacyHeaders: false,
     keyGenerator: (req) => (opts.perUser && req.user ? `u:${req.user.uid}` : ipKeyGenerator(req.ip ?? '0.0.0.0')),
     handler: (_req, res) => res.status(429).json(limitBody),
+    // Automated tests replay many sign-ins from one address; app-level limits (sync cooldown) still apply.
+    skip: () => process.env.NODE_ENV === 'test',
   });
 }

@@ -98,11 +98,20 @@ export class AnalyticsService {
     const lib = await this.library.load(uid);
     const games = lib.entries.map(toAnalyticsGame);
     const purchases = games.flatMap((g) => (g.purchase ? [g.purchase] : []));
+    // A bundle is one transaction; its games' shares already add up to the bundle total.
+    const records = lib.entries.flatMap((e) => (e.purchase ? [e.purchase] : []));
+    const bundleIds = new Set(records.flatMap((p) => (p.bundle ? [p.bundle.id] : [])));
+    const singles = records.filter((p) => !p.bundle).length;
     return {
       lib,
       dto: {
         estimated: libraryValue(games, lib.region, toIso(lib.lastPriceUpdateAt)),
-        recorded: { totals: sumByCurrency(purchases), purchaseCount: purchases.length, disclaimer: 'user_entered_unverified' },
+        recorded: {
+          totals: sumByCurrency(purchases),
+          purchaseCount: singles + bundleIds.size,
+          bundleCount: bundleIds.size,
+          disclaimer: 'user_entered_unverified',
+        },
         mostExpensive: gameValues(lib).sort((a, b) => b.price.amount - a.price.amount).slice(0, TOP_N),
       },
     };

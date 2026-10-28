@@ -3,8 +3,8 @@
  */
 import type { CurrencyCode, PurchaseSource, SteamPersonaState } from './constants';
 import type {
-  AchievementDataStatus, CommunityVisibility, PriceStatus, SyncScope, SyncStage,
-  SyncStatus, SyncTrigger, UserPreferences,
+  AchievementDataStatus, BundleAllocation, CommunityVisibility, PriceStatus, PurchaseBundleRef, PurchaseOrigin,
+  SyncScope, SyncStage, SyncStatus, SyncTrigger, UserPreferences,
 } from './models';
 
 export interface ApiSuccess<T> {
@@ -34,6 +34,9 @@ export type ErrorCode =
   | 'STEAM_UNAVAILABLE'
   | 'SYNC_IN_PROGRESS'
   | 'RATE_LIMITED'
+  | 'PURCHASE_CONFLICT'
+  | 'IMPORT_UNAVAILABLE'
+  | 'IMPORT_FAILED'
   | 'INTERNAL';
 
 export interface ApiErrorBody {
@@ -124,15 +127,79 @@ export interface GameAchievementSummaryDto {
 
 export interface PurchaseDto {
   appId: number;
+  /** Game name from the synced library (null if the game is no longer in it). */
+  gameName: string | null;
   amount: number;
   currency: CurrencyCode;
   purchaseDate: string | null;
   source: PurchaseSource;
   notes: string;
+  bundle: PurchaseBundleRef | null;
+  origin: PurchaseOrigin;
   createdAt: string;
   updatedAt: string;
   /** Always true: purchases are entered by the user and are not verified. */
   userEntered: true;
+}
+
+export interface BundleDto {
+  id: string;
+  total: number;
+  currency: CurrencyCode;
+  purchaseDate: string | null;
+  source: PurchaseSource;
+  notes: string;
+  allocation: BundleAllocation;
+  origin: PurchaseOrigin;
+  items: { appId: number; name: string; amount: number }[];
+}
+
+// ---------- Screenshot import ----------
+
+export type ImportTransactionType =
+  | 'purchase'
+  | 'gift_purchase'
+  | 'refund'
+  | 'wallet_credit'
+  | 'market'
+  | 'in_game_purchase'
+  | 'other';
+
+export type ImportItemKind = 'game' | 'non_game' | 'unmatched';
+
+export interface ImportItemDto {
+  /** Item name as read from the screenshot. */
+  name: string;
+  /** Owned game this item was matched to (by name). */
+  appId: number | null;
+  matchedName: string | null;
+  kind: ImportItemKind;
+  /** Why a non-game item was filtered (dlc, soundtrack, software, wallet_credit, refund, …). */
+  reason: string | null;
+  /** The matched game already has a purchase record. */
+  alreadyRecorded: boolean;
+}
+
+export interface ImportTransactionDto {
+  key: string;
+  date: string | null;
+  type: ImportTransactionType;
+  total: number | null;
+  /** null when the currency could not be read or is not supported. */
+  currency: CurrencyCode | null;
+  items: ImportItemDto[];
+}
+
+export interface ImportPreviewDto {
+  /** false when the image does not look like a purchase history. */
+  recognized: boolean;
+  transactions: ImportTransactionDto[];
+}
+
+export interface ImportCommitResultDto {
+  created: number;
+  bundlesCreated: number;
+  skipped: number;
 }
 
 export interface GameListItemDto {
@@ -294,7 +361,9 @@ export interface LibraryValueDto {
   estimated: LibraryValueSummary;
   recorded: {
     totals: CurrencyTotal[];
+    /** Transactions: a bundle counts once. */
     purchaseCount: number;
+    bundleCount: number;
     /** Purchases are user-entered and not verified. */
     disclaimer: 'user_entered_unverified';
   };

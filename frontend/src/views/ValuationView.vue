@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { LibraryValueDto, PurchaseDto } from '@steam-analytics/shared';
+import type { LibraryValueDto, PurchaseBundleRef, PurchaseDto } from '@steam-analytics/shared';
 import { api } from '@/services/api';
 import { useApi } from '@/composables/useAsync';
 import { useFormat } from '@/composables/useFormat';
@@ -13,6 +13,8 @@ import StatCard from '@/components/ui/StatCard.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import DataAsOf from '@/components/ui/DataAsOf.vue';
+import AppIcon from '@/components/ui/AppIcon.vue';
+import BundleEditor from '@/components/steam/BundleEditor.vue';
 
 const { t } = useI18n();
 const f = useFormat();
@@ -21,6 +23,37 @@ const value = useApi(() => api.get<LibraryValueDto>('/analytics/library-value'),
 const purchases = useApi(() => api.get<PurchaseDto[]>('/purchases'), [() => steam.dataRevision]);
 
 const est = computed(() => value.data.value?.estimated);
+
+/** Single purchases and bundles (games bought together), newest first as returned by the API. */
+const purchaseGroups = computed(() => {
+  const groups: { key: string; bundle: PurchaseBundleRef | null; items: PurchaseDto[] }[] = [];
+  const byBundle = new Map<string, (typeof groups)[number]>();
+  for (const p of purchases.data.value ?? []) {
+    if (!p.bundle) {
+      groups.push({ key: `p${p.appId}`, bundle: null, items: [p] });
+      continue;
+    }
+    let g = byBundle.get(p.bundle.id);
+    if (!g) {
+      g = { key: p.bundle.id, bundle: p.bundle, items: [] };
+      byBundle.set(p.bundle.id, g);
+      groups.push(g);
+    }
+    g.items.push(p);
+  }
+  return groups;
+});
+
+const bundleOpen = ref(false);
+const bundleId = ref<string | null>(null);
+function openBundle(id: string | null) {
+  bundleId.value = id;
+  bundleOpen.value = true;
+}
+function onBundleSaved() {
+  bundleOpen.value = false;
+  steam.dataRevision += 1;
+}
 const coverageOption = computed<ChartOption>(() => ({
   tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
   legend: { bottom: 0 },
@@ -100,32 +133,60 @@ const coverageOption = computed<ChartOption>(() => ({
           <div class="flex flex-wrap items-center gap-2">
             <h2 class="section-title">{{ $t('valuation.modelB') }}</h2>
             <span class="badge bg-warning/15 text-warning">{{ $t('purchase.unverified') }}</span>
+            <div class="ml-auto flex flex-wrap gap-2">
+              <button type="button" class="btn btn-secondary" @click="openBundle(null)"><AppIcon name="layers" :size="16" />{{ $t('bundle.add') }}</button>
+              <RouterLink :to="{ name: 'import' }" class="btn btn-primary"><AppIcon name="upload" :size="16" />{{ $t('import.cta') }}</RouterLink>
+            </div>
           </div>
           <p class="text-sm text-muted">{{ $t('valuation.modelBDescription') }}</p>
           <div class="grid gap-4 sm:grid-cols-2">
             <StatCard :label="$t('valuation.recordedSpending')" icon="wallet" :loading="value.loading.value" :unavailable="!value.data.value?.recorded.totals.length" :value="f.totals(value.data.value?.recorded.totals)" :hint="$t('valuation.noConversion')" />
-            <StatCard :label="$t('valuation.purchaseCount')" icon="list" :loading="value.loading.value" :value="value.data.value ? f.number(value.data.value.recorded.purchaseCount) : null" />
+            <StatCard
+              :label="$t('valuation.purchaseCount')"
+              icon="list"
+              :loading="value.loading.value"
+              :value="value.data.value ? f.number(value.data.value.recorded.purchaseCount) : null"
+              :hint="value.data.value?.recorded.bundleCount ? $t('valuation.bundleCount', { n: value.data.value.recorded.bundleCount }) : undefined"
+            />
           </div>
           <div class="card overflow-x-auto p-0">
             <ErrorState v-if="purchases.error.value" :error="purchases.error.value" compact @retry="purchases.reload" />
-            <table v-else-if="purchases.data.value?.length" class="w-full min-w-[36rem] text-sm">
+            <table v-else-if="purchaseGroups.length" class="w-full min-w-[40rem] text-sm">
               <thead class="border-b border-line text-left text-xs text-muted uppercase">
-                <tr><th class="px-5 py-2">AppID</th><th class="px-5 py-2 text-right">{{ $t('purchase.amount') }}</th><th class="px-5 py-2">{{ $t('purchase.date') }}</th><th class="px-5 py-2">{{ $t('purchase.source') }}</th><th class="px-5 py-2">{{ $t('purchase.notes') }}</th></tr>
+                <tr><th class="px-5 py-2">{{ $t('game.name') }}</th><th class="px-5 py-2 text-right">{{ $t('purchase.amount') }}</th><th class="px-5 py-2">{{ $t('purchase.date') }}</th><th class="px-5 py-2">{{ $t('purchase.source') }}</th><th class="px-5 py-2">{{ $t('purchase.notes') }}</th></tr>
               </thead>
               <tbody>
-                <tr v-for="p in purchases.data.value" :key="p.appId" class="border-b border-line/60 last:border-0">
-                  <td class="px-5 py-2"><RouterLink :to="{ name: 'game', params: { appid: p.appId } }" class="font-mono hover:text-accent">{{ p.appId }}</RouterLink></td>
-                  <td class="px-5 py-2 text-right">{{ f.money(p) }}</td>
-                  <td class="px-5 py-2">{{ p.purchaseDate ?? $t('common.notRecorded') }}</td>
-                  <td class="px-5 py-2">{{ $t(`purchase.sources.${p.source}`) }}</td>
-                  <td class="max-w-xs truncate px-5 py-2 text-muted">{{ p.notes }}</td>
-                </tr>
+                <template v-for="g in purchaseGroups" :key="g.key">
+                  <tr v-if="g.bundle" class="border-t border-line bg-surface-2/40">
+                    <td class="px-5 py-2">
+                      <button type="button" class="flex items-center gap-2 font-medium hover:text-accent" @click="openBundle(g.bundle.id)">
+                        <AppIcon name="layers" :size="16" class="text-accent" />{{ $t('bundle.label', { n: g.items.length }) }}
+                        <span v-if="g.items[0]!.origin === 'screenshot_import'" class="badge bg-accent/10 text-accent">{{ $t('import.imported') }}</span>
+                      </button>
+                    </td>
+                    <td class="px-5 py-2 text-right font-medium">{{ f.money({ amount: g.bundle.total, currency: g.items[0]!.currency }) }}</td>
+                    <td class="px-5 py-2">{{ g.items[0]!.purchaseDate ?? $t('common.notRecorded') }}</td>
+                    <td class="px-5 py-2">{{ $t(`purchase.sources.${g.items[0]!.source}`) }}</td>
+                    <td class="max-w-xs truncate px-5 py-2 text-muted">{{ g.items[0]!.notes }}</td>
+                  </tr>
+                  <tr v-for="p in g.items" :key="p.appId" class="border-b border-line/60 last:border-0">
+                    <td class="px-5 py-2" :class="g.bundle ? 'pl-11' : ''">
+                      <RouterLink :to="{ name: 'game', params: { appid: p.appId } }" class="hover:text-accent">{{ p.gameName ?? `#${p.appId}` }}</RouterLink>
+                      <span v-if="!g.bundle && p.origin === 'screenshot_import'" class="badge ml-2 bg-accent/10 text-accent">{{ $t('import.imported') }}</span>
+                    </td>
+                    <td class="px-5 py-2 text-right" :class="g.bundle ? 'text-muted' : ''">{{ f.money(p) }}</td>
+                    <td class="px-5 py-2">{{ g.bundle ? '' : (p.purchaseDate ?? $t('common.notRecorded')) }}</td>
+                    <td class="px-5 py-2">{{ g.bundle ? '' : $t(`purchase.sources.${p.source}`) }}</td>
+                    <td class="max-w-xs truncate px-5 py-2 text-muted">{{ g.bundle ? '' : p.notes }}</td>
+                  </tr>
+                </template>
               </tbody>
             </table>
             <p v-else class="p-5 text-sm text-muted">{{ $t('valuation.noPurchases') }}</p>
           </div>
         </section>
       </template>
+      <BundleEditor :open="bundleOpen" :bundle-id="bundleId" @close="bundleOpen = false" @saved="onBundleSaved" />
     </div>
   </SteamRequired>
 </template>

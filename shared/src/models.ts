@@ -95,7 +95,22 @@ export interface PlayerAchievementStateDoc {
   syncedAt: Date;
 }
 
-/** users/{uid}/gamePurchases/{appid} — user-entered, never verified. */
+export type BundleAllocation = 'store_price' | 'even' | 'manual';
+export type PurchaseOrigin = 'manual' | 'screenshot_import';
+
+/** Shared by every game bought together in one transaction. */
+export interface PurchaseBundleRef {
+  id: string;
+  /** What was paid for the whole bundle; the games' `amount`s add up to this. */
+  total: number;
+  itemCount: number;
+  allocation: BundleAllocation;
+}
+
+/**
+ * users/{uid}/gamePurchases/{appid} — user-entered, never verified.
+ * For a bundle, `amount` is this game's allocated share of `bundle.total`.
+ */
 export interface PurchaseDoc {
   appId: number;
   amount: number;
@@ -103,6 +118,8 @@ export interface PurchaseDoc {
   purchaseDate: string | null;
   source: PurchaseSource;
   notes: string;
+  bundle?: PurchaseBundleRef | null;
+  origin?: PurchaseOrigin;
   createdAt: Date;
   updatedAt: Date;
 }

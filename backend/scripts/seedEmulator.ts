@@ -22,7 +22,7 @@ if (!email) {
   process.exit(1);
 }
 
-const { db, auth } = initFirebase('demo-steam-analytics');
+const { db, auth } = initFirebase(process.env.FIREBASE_PROJECT_ID ?? 'demo-steam-analytics');
 const user = await auth.getUserByEmail(email);
 const uid = user.uid;
 const steamId = '76561190000000001';
