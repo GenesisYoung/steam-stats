@@ -123,7 +123,7 @@ export class PurchaseService {
     await this.changed(uid);
   }
 
-  /** Save reviewed screenshot transactions: one game = single record, several = bundle. */
+  /** Save reviewed import transactions: one game = single record, several = bundle. */
   async commitImport(uid: string, input: ImportCommitInput): Promise<ImportCommitResultDto> {
     const allIds = input.transactions.flatMap((t) => t.appIds);
     if (new Set(allIds).size !== allIds.length) throw errors.purchaseConflict('A game appears in more than one transaction', []);
@@ -142,11 +142,15 @@ export class PurchaseService {
         return keep;
       });
       if (appIds.length === 0) continue;
+      // Known per-game prices: keep them (dropping skipped games keeps the shares consistent).
+      const shares = t.shares?.filter((s) => appIds.includes(s.appId));
+      const total = shares ? shares.reduce((sum, s) => sum + Math.round(s.amount * 100), 0) / 100 : t.total;
       const now = new Date();
       if (appIds.length === 1) {
-        docs.push({ appId: appIds[0]!, amount: t.total, currency: t.currency, purchaseDate: t.purchaseDate, source: t.source, notes: t.notes, bundle: null, origin: 'screenshot_import', createdAt: now, updatedAt: now });
+        docs.push({ appId: appIds[0]!, amount: total, currency: t.currency, purchaseDate: t.purchaseDate, source: t.source, notes: t.notes, bundle: null, origin: 'file_import', createdAt: now, updatedAt: now });
       } else {
-        docs.push(...(await this.bundleDocs(uid, { ...t, appIds, allocation: 'store_price', replaceExisting: input.replaceExisting }, `b_${randomToken(12)}`, 'screenshot_import')));
+        const allocation = shares ? 'manual' : 'store_price';
+        docs.push(...(await this.bundleDocs(uid, { ...t, appIds, total, shares, allocation, replaceExisting: input.replaceExisting }, `b_${randomToken(12)}`, 'file_import')));
         bundlesCreated += 1;
       }
       created += appIds.length;

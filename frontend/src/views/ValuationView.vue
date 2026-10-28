@@ -161,7 +161,7 @@ const coverageOption = computed<ChartOption>(() => ({
                     <td class="px-5 py-2">
                       <button type="button" class="flex items-center gap-2 font-medium hover:text-accent" @click="openBundle(g.bundle.id)">
                         <AppIcon name="layers" :size="16" class="text-accent" />{{ $t('bundle.label', { n: g.items.length }) }}
-                        <span v-if="g.items[0]!.origin === 'screenshot_import'" class="badge bg-accent/10 text-accent">{{ $t('import.imported') }}</span>
+                        <span v-if="g.items[0]!.origin === 'file_import'" class="badge bg-accent/10 text-accent">{{ $t('import.imported') }}</span>
                       </button>
                     </td>
                     <td class="px-5 py-2 text-right font-medium">{{ f.money({ amount: g.bundle.total, currency: g.items[0]!.currency }) }}</td>
@@ -172,7 +172,7 @@ const coverageOption = computed<ChartOption>(() => ({
                   <tr v-for="p in g.items" :key="p.appId" class="border-b border-line/60 last:border-0">
                     <td class="px-5 py-2" :class="g.bundle ? 'pl-11' : ''">
                       <RouterLink :to="{ name: 'game', params: { appid: p.appId } }" class="hover:text-accent">{{ p.gameName ?? `#${p.appId}` }}</RouterLink>
-                      <span v-if="!g.bundle && p.origin === 'screenshot_import'" class="badge ml-2 bg-accent/10 text-accent">{{ $t('import.imported') }}</span>
+                      <span v-if="!g.bundle && p.origin === 'file_import'" class="badge ml-2 bg-accent/10 text-accent">{{ $t('import.imported') }}</span>
                     </td>
                     <td class="px-5 py-2 text-right" :class="g.bundle ? 'text-muted' : ''">{{ f.money(p) }}</td>
                     <td class="px-5 py-2">{{ g.bundle ? '' : (p.purchaseDate ?? $t('common.notRecorded')) }}</td>

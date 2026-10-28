@@ -76,7 +76,7 @@ d('Firestore Security Rules', () => {
     await assertFails(setDoc(doc(bob(), 'users/alice/gamePurchases/10'), valid()));
     await assertSucceeds(deleteDoc(doc(alice(), 'users/alice/gamePurchases/10')));
     const bundle = { id: 'b_abcdefgh1234', total: 30, itemCount: 2, allocation: 'store_price' };
-    await assertSucceeds(setDoc(doc(alice(), 'users/alice/gamePurchases/10'), { ...valid(), bundle, origin: 'screenshot_import' }));
+    await assertSucceeds(setDoc(doc(alice(), 'users/alice/gamePurchases/10'), { ...valid(), bundle, origin: 'file_import' }));
     await assertFails(setDoc(doc(alice(), 'users/alice/gamePurchases/10'), { ...valid(), bundle: { ...bundle, allocation: 'random' } }));
     await assertFails(setDoc(doc(alice(), 'users/alice/gamePurchases/10'), { ...valid(), bundle: { ...bundle, verified: true } }));
     await assertFails(setDoc(doc(alice(), 'users/alice/gamePurchases/10'), { ...valid(), origin: 'steam_api' }));

@@ -17,7 +17,10 @@ export function createApp(c: Container) {
 
   app.use(securityHeaders());
   app.use(corsPolicy([c.env.PUBLIC_APP_URL, c.env.PUBLIC_API_URL, ...c.env.CORS_ORIGINS]));
-  app.use(express.json({ limit: '32kb' }));
+  // Spreadsheet imports carry up to a few thousand rows; every other body stays small.
+  const smallJson = express.json({ limit: '32kb' });
+  const importJson = express.json({ limit: '1mb' });
+  app.use((req, res, next) => (req.path.startsWith('/api/purchases/import/') ? importJson : smallJson)(req, res, next));
   app.use(cookieParser());
   app.use((_req, res, next) => {
     res.setHeader('Cache-Control', 'private, no-cache');

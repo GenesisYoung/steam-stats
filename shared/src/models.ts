@@ -96,7 +96,7 @@ export interface PlayerAchievementStateDoc {
 }
 
 export type BundleAllocation = 'store_price' | 'even' | 'manual';
-export type PurchaseOrigin = 'manual' | 'screenshot_import';
+export type PurchaseOrigin = 'manual' | 'file_import';
 
 /** Shared by every game bought together in one transaction. */
 export interface PurchaseBundleRef {

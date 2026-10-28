@@ -16,7 +16,7 @@ export class ApiError extends Error {
 
 type Query = Record<string, string | number | boolean | undefined | null>;
 
-async function call<T>(method: string, path: string, opts: { query?: Query; body?: unknown; blob?: Blob; retryAuth?: boolean } = {}): Promise<ApiSuccess<T>> {
+async function call<T>(method: string, path: string, opts: { query?: Query; body?: unknown; retryAuth?: boolean } = {}): Promise<ApiSuccess<T>> {
   const url = new URL(BASE + path, window.location.origin);
   for (const [k, v] of Object.entries(opts.query ?? {})) if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, String(v));
 
@@ -24,8 +24,7 @@ async function call<T>(method: string, path: string, opts: { query?: Query; body
   const headers: Record<string, string> = {};
   if (user) headers.Authorization = `Bearer ${await user.getIdToken(opts.retryAuth === false)}`;
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
-  if (opts.blob) headers['Content-Type'] = opts.blob.type || 'application/octet-stream';
-  const payload = opts.blob ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined);
+  const payload = opts.body !== undefined ? JSON.stringify(opts.body) : undefined;
 
   let res: Response;
   try {
@@ -51,8 +50,6 @@ export const api = {
   put: <T>(path: string, body: unknown) => call<T>('PUT', path, { body }),
   patch: <T>(path: string, body: unknown) => call<T>('PATCH', path, { body }),
   delete: <T = void>(path: string) => call<T>('DELETE', path),
-  /** POST a file as the raw request body (e.g. a screenshot). */
-  upload: <T>(path: string, blob: Blob) => call<T>('POST', path, { blob }),
 };
 
 export type { ApiMeta };

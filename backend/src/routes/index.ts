@@ -1,5 +1,4 @@
-import express, { Router } from 'express';
-import { IMPORT_MAX_BYTES, IMPORT_MEDIA_TYPES } from '@steam-analytics/shared';
+import { Router } from 'express';
 import type { Container } from '../container';
 import { accountController } from '../controllers/accountController';
 import { analyticsController } from '../controllers/analyticsController';
@@ -52,13 +51,7 @@ export function apiRouter(c: Container): Router {
   router.get('/purchases/bundles/:id', purchases.getBundle);
   router.put('/purchases/bundles/:id', purchases.updateBundle);
   router.delete('/purchases/bundles/:id', purchases.deleteBundle);
-  router.get('/purchases/import', purchases.importStatus);
-  router.post(
-    '/purchases/import/screenshot',
-    limiter({ windowMs: 60 * MIN, limit: 20, perUser: true }),
-    express.raw({ type: [...IMPORT_MEDIA_TYPES], limit: IMPORT_MAX_BYTES }),
-    purchases.importPreview,
-  );
+  router.post('/purchases/import/preview', purchases.importPreview);
   router.post('/purchases/import/commit', purchases.importCommit);
   router.put('/purchases/:appid', purchases.upsert);
   router.delete('/purchases/:appid', purchases.remove);

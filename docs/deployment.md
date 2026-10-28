@@ -173,8 +173,7 @@ npm run build            # backend/dist（tsup 打包）+ frontend/dist（vue-ts
 2. **核对域名**：`apphosting.yaml` 中 `PUBLIC_APP_URL` / `PUBLIC_API_URL` 必须与 App Hosting 后端的域名完全一致（控制台 App Hosting → Backend → Domains）。绑定自定义域名后同步修改。
 3. **授权域名**：Authentication → 设置 → 已获授权的网域，添加 `*.hosted.app` 中你的后端域名。
 4. **部署规则与索引**：同第 3 步（App Hosting 不会自动部署 Firestore 规则）。
-5. （可选）启用截图导入：`npx firebase apphosting:secrets:set anthropic-api-key --project <projectId>`，然后取消 `apphosting.yaml` 末尾 `ANTHROPIC_API_KEY` 的注释。**先创建机密再取消注释**，引用不存在的机密会导致 rollout 失败。
-6. 提交并推送到 `main`，App Hosting 会自动开始新的 rollout。
+5. 提交并推送到 `main`，App Hosting 会自动开始新的 rollout。
 
 注意：App Hosting 的实例在没有请求时会限制 CPU。手动同步在返回 202 后于后台运行，前端每 3 秒轮询同步状态，这通常能让任务继续推进；如遇大型游戏库同步长时间停滞，可改用 11.3 的定时同步（定时调用会在请求内同步完成）或方式 B 的 `--no-cpu-throttling`。
 

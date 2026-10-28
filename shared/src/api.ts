@@ -1,7 +1,7 @@
 /**
  * REST API contracts (JSON over HTTP). All timestamps are ISO-8601 strings.
  */
-import type { CurrencyCode, PurchaseSource, SteamPersonaState } from './constants';
+import type { CurrencyCode, ImportTransactionType, PurchaseSource, SteamPersonaState } from './constants';
 import type {
   AchievementDataStatus, BundleAllocation, CommunityVisibility, PriceStatus, PurchaseBundleRef, PurchaseOrigin,
   SyncScope, SyncStage, SyncStatus, SyncTrigger, UserPreferences,
@@ -35,8 +35,6 @@ export type ErrorCode =
   | 'SYNC_IN_PROGRESS'
   | 'RATE_LIMITED'
   | 'PURCHASE_CONFLICT'
-  | 'IMPORT_UNAVAILABLE'
-  | 'IMPORT_FAILED'
   | 'INTERNAL';
 
 export interface ApiErrorBody {
@@ -154,22 +152,15 @@ export interface BundleDto {
   items: { appId: number; name: string; amount: number }[];
 }
 
-// ---------- Screenshot import ----------
-
-export type ImportTransactionType =
-  | 'purchase'
-  | 'gift_purchase'
-  | 'refund'
-  | 'wallet_credit'
-  | 'market'
-  | 'in_game_purchase'
-  | 'other';
+// ---------- Spreadsheet (CSV / Excel) import ----------
 
 export type ImportItemKind = 'game' | 'non_game' | 'unmatched';
 
 export interface ImportItemDto {
-  /** Item name as read from the screenshot. */
+  /** Item name as written in the file. */
   name: string;
+  /** This item's own price when the file gives one per item (bundles with known shares). */
+  amount: number | null;
   /** Owned game this item was matched to (by name). */
   appId: number | null;
   matchedName: string | null;
@@ -187,12 +178,12 @@ export interface ImportTransactionDto {
   total: number | null;
   /** null when the currency could not be read or is not supported. */
   currency: CurrencyCode | null;
+  source: PurchaseSource | null;
+  notes: string;
   items: ImportItemDto[];
 }
 
 export interface ImportPreviewDto {
-  /** false when the image does not look like a purchase history. */
-  recognized: boolean;
   transactions: ImportTransactionDto[];
 }
 

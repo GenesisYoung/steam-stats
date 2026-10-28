@@ -47,6 +47,11 @@ export const PURCHASE_SOURCES = [
 ] as const;
 export type PurchaseSource = (typeof PURCHASE_SOURCES)[number];
 
+export const IMPORT_TRANSACTION_TYPES = [
+  'purchase', 'gift_purchase', 'refund', 'wallet_credit', 'market', 'in_game_purchase', 'other',
+] as const;
+export type ImportTransactionType = (typeof IMPORT_TRANSACTION_TYPES)[number];
+
 export const STEAM_PERSONA_STATES = [
   'offline', 'online', 'busy', 'away', 'snooze', 'looking_to_trade', 'looking_to_play',
 ] as const;

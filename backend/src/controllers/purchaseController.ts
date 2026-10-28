@@ -1,5 +1,5 @@
 import {
-  appIdSchema, bundleInputSchema, importCommitSchema, purchaseInputSchema, IMPORT_MAX_BYTES,
+  appIdSchema, bundleInputSchema, importCommitSchema, importPreviewSchema, purchaseInputSchema,
 } from '@steam-analytics/shared';
 import { z } from 'zod';
 import type { Container } from '../container';
@@ -9,7 +9,6 @@ import { errors } from '../lib/errors';
 import { ok } from '../lib/respond';
 
 import { toPurchaseDto } from '../services/purchaseService';
-import { sniffImageType } from '../services/importService';
 
 const bundleIdSchema = z.string().regex(/^b_[A-Za-z0-9_-]{8,40}$/);
 
@@ -54,17 +53,11 @@ export function purchaseController(c: Container) {
       await c.purchaseService.deleteBundle(uid, bundleIdSchema.parse(req.params.id));
       res.status(204).end();
     }),
-    importStatus: handler(async (_req, res) => {
-      ok(res, { available: c.imports.available, maxBytes: IMPORT_MAX_BYTES });
-    }),
     importPreview: handler(async (req, res) => {
       const { uid } = currentUser(req);
-      const body = req.body;
-      if (!Buffer.isBuffer(body) || body.length === 0) throw errors.importFailed('Upload a PNG, JPEG, WebP or GIF image');
-      const mediaType = sniffImageType(body);
-      if (!mediaType) throw errors.importFailed('Upload a PNG, JPEG, WebP or GIF image');
+      const input = importPreviewSchema.parse(req.body);
       await c.library.requireLinkedUser(uid);
-      ok(res, await c.imports.preview(uid, body, mediaType));
+      ok(res, await c.imports.preview(uid, input));
     }),
     importCommit: handler(async (req, res) => {
       const { uid } = currentUser(req);

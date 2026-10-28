@@ -26,9 +26,6 @@ const envSchema = z.object({
     .string()
     .default('')
     .refine((s) => s === '' || s.length >= 32, 'CRON_SECRET must be at least 32 characters'),
-  /** Enables purchase import from screenshots (Claude vision). Unset = feature disabled. */
-  ANTHROPIC_API_KEY: z.string().optional().transform((v) => v?.trim() || undefined),
-  IMPORT_MODEL: z.string().min(1).default('claude-opus-5-5'),
   SYNC_ACHIEVEMENT_BATCH: z.coerce.number().int().min(1).max(5000).default(200),
   SYNC_METADATA_BATCH: z.coerce.number().int().min(1).max(5000).default(150),
 });

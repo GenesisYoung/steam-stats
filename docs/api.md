@@ -156,15 +156,28 @@ Steam 回调。校验后 `303` 跳转到：
 - 每款游戏的 `gamePurchases/{appid}` 文档保存其分摊金额，并带 `bundle: { id, total, itemCount, allocation }`；统计"已记录花费"时捆绑包只计一次交易。
 - 已有单独记录的游戏默认冲突（`409`，`details.appIds`），设 `replaceExisting: true` 可覆盖。
 
-### 截图导入
+### 表格导入（CSV / Excel）
+
+文件在浏览器中解析（CSV：papaparse；.xlsx：read-excel-file），服务器只接收解析后的交易数据，不接收文件本身。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/purchases/import` | `{ available, maxBytes }`，未配置 `ANTHROPIC_API_KEY` 时 `available: false` |
-| POST | `/purchases/import/screenshot` | 请求体为图片原始字节（`Content-Type: image/png` 等，≤5 MB，按文件头校验格式），返回 `ImportPreviewDto`，**不保存任何数据**；每用户每小时 20 次 |
-| POST | `/purchases/import/commit` | 保存用户核对后的交易：一款游戏 = 单独记录，多款 = 捆绑包（按商店价格分摊） |
+| POST | `/purchases/import/preview` | 发送解析后的交易（≤2000 笔，请求体 ≤1 MB），返回匹配结果 `ImportPreviewDto`，**不保存任何数据** |
+| POST | `/purchases/import/commit` | 保存用户核对后的交易：一款游戏 = 单独记录；多款 = 捆绑包 |
 
-预览中每个条目带 `kind`：`game`（已匹配游戏库）、`non_game`（DLC、原声、软件、钱包充值、市场、游戏内购买、退款；`reason` 说明原因）、`unmatched`（不在游戏库中）。截图由 Claude（`IMPORT_MODEL`，默认 `claude-opus-5-5`）以结构化输出识别，图片不落盘。
+预览请求：
+
+```json
+{ "transactions": [
+  { "date": "2024-11-28", "type": "purchase", "total": 15, "currency": "USD", "source": "bundle", "notes": "",
+    "items": [{ "name": "Portal 2", "amount": 6 }, { "name": "Half-Life 2", "amount": 9 }] }
+] }
+```
+
+- 每个条目带 `kind`：`game`（匹配到游戏库）、`non_game`（DLC、原声、软件、钱包充值、市场、游戏内购买、退款；`reason` 说明原因）、`unmatched`（不在游戏库中）。
+- 捆绑包：文件中订单号相同的行合并为一笔交易；一个单元格中用 `;` 或换行分隔的多款游戏也视为一笔交易。
+- 提交时若捆绑包中每款游戏都有各自价格，前端发送 `shares`（合计必须等于 `total`），保存为手动分摊；否则按商店价格分摊。
+- 导入的记录 `origin` 为 `file_import`。
 
 ---
 

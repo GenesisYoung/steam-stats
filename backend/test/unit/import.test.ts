@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GameMatcher, classifyItem, normalizeTitle, sniffImageType } from '../../src/services/importService';
+import { GameMatcher, classifyItem, normalizeTitle } from '../../src/services/importService';
 import type { LibraryEntry } from '../../src/services/libraryService';
 
 const entry = (appId: number, name: string, type: string | null = 'game'): LibraryEntry =>
@@ -57,14 +57,5 @@ describe('classifyItem', () => {
 
   it('leaves unknown games as unmatched', () => {
     expect(classifyItem('Hollow Knight', 'purchase', matcher, recorded)).toMatchObject({ kind: 'unmatched', appId: null });
-  });
-});
-
-describe('sniffImageType', () => {
-  it('detects formats from magic bytes', () => {
-    expect(sniffImageType(Buffer.from('89504e470d0a1a0a0000000000', 'hex'))).toBe('image/png');
-    expect(sniffImageType(Buffer.from('ffd8ffe000104a4649460001', 'hex'))).toBe('image/jpeg');
-    expect(sniffImageType(Buffer.from('RIFF0000WEBPVP8 ', 'ascii'))).toBe('image/webp');
-    expect(sniffImageType(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg">', 'ascii'))).toBeNull();
   });
 });

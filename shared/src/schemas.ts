@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  CURRENCIES, PURCHASE_SOURCES, STORE_REGION_CODES, SUPPORTED_LANGUAGES, THEMES,
+  CURRENCIES, IMPORT_TRANSACTION_TYPES, PURCHASE_SOURCES, STORE_REGION_CODES, SUPPORTED_LANGUAGES, THEMES,
 } from './constants';
 
 export const steamIdSchema = z.string().regex(/^7656119\d{10}$/, 'Invalid SteamID64');
@@ -112,10 +112,35 @@ export const bundleInputSchema = z
   });
 export type BundleInput = z.infer<typeof bundleInputSchema>;
 
-export const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
-export const IMPORT_MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const;
+export const IMPORT_MAX_TRANSACTIONS = 2000;
 
-/** Reviewed transactions to save after a screenshot import. */
+/** Transactions parsed from a CSV / Excel file in the browser, sent for matching. */
+export const importPreviewSchema = z
+  .object({
+    transactions: z
+      .array(
+        z
+          .object({
+            date: isoDate.nullable(),
+            type: z.enum(IMPORT_TRANSACTION_TYPES).default('purchase'),
+            total: money.nullable(),
+            currency: z.enum(CURRENCIES).nullable(),
+            source: z.enum(PURCHASE_SOURCES).nullable().default(null),
+            notes: z.string().trim().max(500).default(''),
+            items: z
+              .array(z.object({ name: z.string().trim().min(1).max(300), amount: money.nullable().default(null) }).strict())
+              .min(1)
+              .max(100),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(IMPORT_MAX_TRANSACTIONS),
+  })
+  .strict();
+export type ImportPreviewInput = z.infer<typeof importPreviewSchema>;
+
+/** Reviewed transactions to save after an import. */
 export const importCommitSchema = z
   .object({
     transactions: z
@@ -128,11 +153,22 @@ export const importCommitSchema = z
             purchaseDate: optionalPastDate,
             source: z.enum(PURCHASE_SOURCES).default('steam'),
             notes: z.string().trim().max(500).default(''),
+            /** Known per-game prices for a bundle; must add up to total. Omit to split by store price. */
+            shares: z.array(z.object({ appId: appIdSchema, amount: money })).optional(),
           })
-          .strict(),
+          .strict()
+          .superRefine((t, ctx) => {
+            if (!t.shares) return;
+            const ids = new Set(t.shares.map((s) => s.appId));
+            if (ids.size !== t.appIds.length || !t.appIds.every((id) => ids.has(id))) {
+              ctx.addIssue({ code: 'custom', path: ['shares'], message: 'One share per game is required' });
+            }
+            const sum = t.shares.reduce((a, s) => a + Math.round(s.amount * 100), 0);
+            if (sum !== Math.round(t.total * 100)) ctx.addIssue({ code: 'custom', path: ['shares'], message: 'Shares must add up to the total' });
+          }),
       )
       .min(1)
-      .max(200),
+      .max(IMPORT_MAX_TRANSACTIONS),
     replaceExisting: z.boolean().default(false),
   })
   .strict();

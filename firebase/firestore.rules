@@ -84,7 +84,7 @@ service cloud.firestore {
                 && (d.bundle.total is int || d.bundle.total is float) && d.bundle.total >= 0 && d.bundle.total <= 100000
                 && d.bundle.itemCount is int && d.bundle.itemCount >= 2
                 && d.bundle.allocation in ['store_price', 'even', 'manual']))
-            && (!('origin' in d) || d.origin in ['manual', 'screenshot_import'])
+            && (!('origin' in d) || d.origin in ['manual', 'file_import'])
             && d.createdAt is timestamp && d.updatedAt is timestamp
             && d.updatedAt == request.time;
         }
