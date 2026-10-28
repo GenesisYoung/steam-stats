@@ -87,6 +87,12 @@ export interface OwnedGameDoc {
   updatedAt: Date;
 }
 
+/** users/{uid}/hiddenGames/{appid} — user choices kept separately from Steam sync data. */
+export interface HiddenGameDoc {
+  appId: number;
+  excludeFromStats: boolean;
+}
+
 /** users/{uid}/games/{appid}/achievements/state */
 export interface PlayerAchievementStateDoc {
   appId: number;

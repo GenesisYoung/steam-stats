@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import type { SteamAuthStartDto, SteamProfileDto, SyncJobDto, SyncScope, SyncStatusDto } from '@steam-analytics/shared';
+import type { GameVisibilityInput, SteamAuthStartDto, SteamProfileDto, SyncJobDto, SyncScope, SyncStatusDto } from '@steam-analytics/shared';
 import { api, ApiError } from '@/services/api';
 import { useAuthStore } from './auth';
 
@@ -77,6 +77,12 @@ export const useSteamStore = defineStore('steam', () => {
     await useAuthStore().loadMe();
   }
 
+  async function setGameVisibility(appId: number, input: GameVisibilityInput) {
+    await api.patch(`/steam/games/${appId}/visibility`, input);
+    dataRevision.value += 1;
+    await loadProfile();
+  }
+
   function reset() {
     profile.value = null;
     sync.value = null;
@@ -85,5 +91,5 @@ export const useSteamStore = defineStore('steam', () => {
     pollTimer = null;
   }
 
-  return { profile, profileSource, profileError, profileLoading, sync, syncing, dataRevision, loadProfile, loadSyncStatus, startSync, startLink, unlink, reset };
+  return { profile, profileSource, profileError, profileLoading, sync, syncing, dataRevision, loadProfile, loadSyncStatus, startSync, startLink, unlink, setGameVisibility, reset };
 });

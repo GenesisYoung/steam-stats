@@ -11,6 +11,8 @@ const global = () => ({ plugins: [i18n()], stubs: { RouterLink: RouterLinkStub }
 
 const game = (over: Partial<GameListItemDto> = {}): GameListItemDto => ({
   appId: 10,
+  hidden: false,
+  excludedFromStats: false,
   name: 'Test Game',
   coverUrl: 'https://example.test/c.jpg',
   iconUrl: null,

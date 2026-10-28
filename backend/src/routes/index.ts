@@ -36,6 +36,7 @@ export function apiRouter(c: Container): Router {
   router.get('/steam/profile', steam.profile);
   router.get('/steam/games', steam.games);
   router.get('/steam/games/:appid', steam.game);
+  router.patch('/steam/games/:appid/visibility', steam.visibility);
   router.get('/steam/games/:appid/achievements', limiter({ windowMs: MIN, limit: 30, perUser: true }), steam.achievements);
   router.post('/steam/sync', limiter({ windowMs: 15 * MIN, limit: 20, perUser: true }), steam.startSync);
   router.get('/steam/sync/status', steam.syncStatus);

@@ -1,7 +1,7 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import type {
   AchievementSchemaDoc, AppMetadataDoc, AppPriceDoc, LinkSessionDoc, OpenIdNonceDoc, OwnedGameDoc,
-  PlayerAchievementStateDoc, PlaytimeSnapshotDoc, PurchaseDoc, SteamLinkDoc, SteamProfileDoc, SyncJobDoc, UserDoc,
+  PlayerAchievementStateDoc, PlaytimeSnapshotDoc, PurchaseDoc, SteamLinkDoc, SteamProfileDoc, SyncJobDoc, UserDoc, HiddenGameDoc,
 } from '@steam-analytics/shared';
 import { converter } from '../lib/firestore';
 
@@ -15,6 +15,8 @@ export function createRefs(db: Firestore) {
     steamProfile: (uid: string) => db.doc(`users/${uid}/steamProfile/current`).withConverter(converter<SteamProfileDoc>()),
     games: (uid: string) => db.collection(`users/${uid}/games`).withConverter(converter<OwnedGameDoc>()),
     game: (uid: string, appId: number) => db.doc(`users/${uid}/games/${appId}`).withConverter(converter<OwnedGameDoc>()),
+    hiddenGames: (uid: string) => db.collection(`users/${uid}/hiddenGames`).withConverter(converter<HiddenGameDoc>()),
+    hiddenGame: (uid: string, appId: number) => db.doc(`users/${uid}/hiddenGames/${appId}`).withConverter(converter<HiddenGameDoc>()),
     achievementState: (uid: string, appId: number) =>
       db.doc(`users/${uid}/games/${appId}/achievements/state`).withConverter(converter<PlayerAchievementStateDoc>()),
     purchases: (uid: string) => db.collection(`users/${uid}/gamePurchases`).withConverter(converter<PurchaseDoc>()),

@@ -483,6 +483,51 @@ d('backend integration (emulators + fake Steam)', () => {
 
   // ---------- Account deletion ----------
 
+  describe('hidden games', () => {
+    it('hides, excludes, optionally includes statistics, and restores without losing records', async () => {
+      const user = await linkedUser();
+      const auth = { Authorization: user.bearer };
+      await h.http().put('/api/purchases/100').set(auth).send({ amount: 30, currency: 'USD' }).expect(200);
+      // Warm the library cache before updating visibility.
+      await h.http().get('/api/analytics/overview').set(auth).expect(200);
+      const hidden = await h.http().patch('/api/steam/games/100/visibility').set(auth).send({ hidden: true }).expect(200);
+      expect(hidden.body.data).toMatchObject({ hidden: true, excludedFromStats: true, purchaseRecord: { amount: 30 } });
+      const visible = await h.http().get('/api/steam/games').set(auth).expect(200);
+      expect(visible.body.meta.total).toBe(4);
+      expect(visible.body.data.map((g: { appId: number }) => g.appId)).not.toContain(100);
+      const list = await h.http().get('/api/steam/games').query({ visibility: 'hidden' }).set(auth).expect(200);
+      expect(list.body.data.map((g: { appId: number }) => g.appId)).toEqual([100]);
+      expect((await h.http().get('/api/analytics/overview').set(auth)).body.data).toMatchObject({ totalGames: 4, totalPlaytimeMinutes: 690, recordedSpending: [] });
+
+      await h.container.refs.user(user.uid).update({ lastSuccessfulSyncAt: new Date(0) });
+      await h.http().post('/api/steam/sync').set(auth).send({ scope: 'full' }).expect(202);
+      await h.container.sync.wait();
+      expect((await h.http().get('/api/steam/games/100').set(auth)).body.data.hidden).toBe(true);
+
+      await h.http().patch('/api/steam/games/100/visibility').set(auth).send({ hidden: true, excludeFromStats: false }).expect(200);
+      expect((await h.http().get('/api/analytics/overview').set(auth)).body.data.totalGames).toBe(5);
+      expect((await h.http().get('/api/steam/games').set(auth)).body.meta.total).toBe(4);
+
+      const restored = await h.http().patch('/api/steam/games/100/visibility').set(auth).send({ hidden: false }).expect(200);
+      expect(restored.body.data).toMatchObject({ hidden: false, excludedFromStats: false, playtimeForeverMinutes: 7200, purchaseRecord: { amount: 30 } });
+      expect((await h.http().get('/api/steam/games').set(auth)).body.meta.total).toBe(5);
+      expect((await h.db.collection(`users/${user.uid}/playtimeSnapshots`).get()).size).toBe(1);
+    });
+
+    it('requires authentication, validates input, and never changes another user’s library', async () => {
+      const owner = await linkedUser();
+      await h.http().patch('/api/steam/games/100/visibility').send({ hidden: true }).expect(401);
+      const other = await linkedUser(STEAM_PRIVATE);
+      await h.http().patch('/api/steam/games/100/visibility').set('Authorization', other.bearer).send({ hidden: true }).expect(404);
+      const auth = { Authorization: owner.bearer };
+      await h.http().patch('/api/steam/games/999/visibility').set(auth).send({ hidden: true }).expect(404);
+      await h.http().patch('/api/steam/games/100/visibility').set(auth).send({ hidden: 'true' }).expect(400);
+      await h.http().patch('/api/steam/games/100/visibility').set(auth).send({ hidden: true, playtimeForeverMinutes: 0 }).expect(400);
+      expect((await h.http().get('/api/steam/games/100').set(auth)).body.data.hidden).toBe(false);
+      expect((await h.db.collection(`users/${owner.uid}/hiddenGames`).get()).empty).toBe(true);
+    });
+  });
+
   describe('account deletion', () => {
     it('requires a recent sign-in', async () => {
       const user = await linkedUser();

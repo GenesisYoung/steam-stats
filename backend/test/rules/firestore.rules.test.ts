@@ -83,6 +83,9 @@ d('Firestore Security Rules', () => {
   });
 
   it('hides server-internal collections', async () => {
+    // Hidden-game changes must go through the API so cache versions update atomically.
+    await assertFails(setDoc(doc(alice(), 'users/alice/hiddenGames/10'), { appId: 10, excludeFromStats: true }));
+    await assertFails(getDoc(doc(bob(), 'users/alice/hiddenGames/10')));
     await assertFails(getDoc(doc(alice(), 'steamLinks/76561198000000001')));
     await assertFails(setDoc(doc(alice(), 'steamLinks/76561198000000002'), { uid: 'alice' }));
     await assertFails(getDoc(doc(alice(), 'linkSessions/x')));

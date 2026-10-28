@@ -9,6 +9,7 @@ import { localTodayIso } from '@/composables/dates';
 import { useAuthStore } from '@/stores/auth';
 import { useSteamStore } from '@/stores/steam';
 import SteamRequired from '@/components/steam/SteamRequired.vue';
+import GameVisibilityControls from '@/components/steam/GameVisibilityControls.vue';
 import PriceTag from '@/components/steam/PriceTag.vue';
 import AchievementProgress from '@/components/steam/AchievementProgress.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
@@ -129,6 +130,8 @@ async function deletePurchase() {
           <img :src="detail.data.value.coverUrl" alt="" class="w-full rounded-lg border border-line object-cover md:w-96" />
           <div class="flex flex-1 flex-col gap-2">
             <h1 class="text-2xl font-semibold">{{ detail.data.value.name }}</h1>
+            <p v-if="detail.data.value.hidden" class="text-sm text-muted">{{ $t('library.hiddenHint') }}</p>
+            <GameVisibilityControls :game="detail.data.value" class="self-start" />
             <p class="font-mono text-xs text-muted">AppID {{ detail.data.value.appId }}<span v-if="detail.data.value.storeType"> · {{ detail.data.value.storeType }}</span></p>
             <PriceTag :price="detail.data.value.price" />
             <p class="text-xs text-muted">

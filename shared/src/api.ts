@@ -195,6 +195,8 @@ export interface ImportCommitResultDto {
 
 export interface GameListItemDto {
   appId: number;
+  hidden: boolean;
+  excludedFromStats: boolean;
   name: string;
   coverUrl: string;
   iconUrl: string | null;

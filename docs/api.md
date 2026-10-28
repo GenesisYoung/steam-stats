@@ -85,12 +85,23 @@ Steam 回调。校验后 `303` 跳转到：
 | `order` | `asc` `desc` | 视排序字段而定 |
 | `played` | `all` `yes` `no` | `all` |
 | `achievements` | `all` `yes` `no` | `all` |
+| `visibility` | `visible` `hidden` `all` | `visible` |
 | `page` / `pageSize` | ≥1 / 1–200 | 1 / 48 |
 
 未知值（无价格、无成就数据）始终排在最后。返回 `GameListItemDto[]`，`meta.total` 为过滤后总数。
 
 ### `GET /steam/games/:appid`
 `GameDetailDto`：列表字段 + 商店类型、购买记录、商店链接。
+
+### `PATCH /steam/games/:appid/visibility`
+```json
+{ "hidden": true, "excludeFromStats": true }
+```
+游戏必须属于当前用户。`excludeFromStats` 默认为 `true`；返回更新后的 `GameDetailDto`，其中 `hidden` 与 `excludedFromStats` 表示当前选择。发送 `{ "hidden": false }` 可取消隐藏并恢复统计。
+
+隐藏设置保存在独立的 `users/{uid}/hiddenGames/{appid}` 子集合中，仅通过已鉴权的后端接口读写。完整同步不会覆盖它；隐藏和取消隐藏不会删除 Steam 数据、历史快照或自填购买记录，解除 Steam 关联后也保留选择。
+
+隐藏游戏不出现在默认游戏库、最近游玩和当前游戏中。勾选「不计入统计」后，游戏数量、时长、成就、估值、购买花费、每小时成本和历史趋势都排除该游戏；取消勾选可继续计入统计。历史趋势按当前选择过滤每张快照的逐游戏数据计算，不改写原始历史。设置保存后立即使各实例缓存失效，无需重新同步 Steam。
 
 ### `GET /steam/games/:appid/achievements`
 `GameAchievementsDto`。若数据缺失或游戏时长自上次同步后有变化，会按需同步一次。成就定义与全球解锁率缓存在共享集合 `steamApps/{appid}/schemas/{lang}`（7 天）。

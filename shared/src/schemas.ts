@@ -35,10 +35,17 @@ export const gameListQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).optional(),
   played: triState,
   achievements: triState,
+  visibility: z.enum(['visible', 'hidden', 'all']).default('visible'),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(48),
 });
 export type GameListQuery = z.infer<typeof gameListQuerySchema>;
+
+export const gameVisibilitySchema = z.object({
+  hidden: z.boolean(),
+  excludeFromStats: z.boolean().default(true),
+}).strict();
+export type GameVisibilityInput = z.infer<typeof gameVisibilitySchema>;
 
 const isoDate = z
   .string()

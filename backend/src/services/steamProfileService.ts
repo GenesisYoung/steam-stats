@@ -6,7 +6,7 @@ import { errors, UpstreamError } from '../lib/errors';
 import { toIso } from '../lib/firestore';
 import { logger } from '../lib/logger';
 import type { SteamDataRepository } from '../repositories/steamDataRepository';
-import { toAnalyticsGame, type LibraryService } from './libraryService';
+import { statisticsEntries, visibleEntries, toAnalyticsGame, type LibraryService } from './libraryService';
 import type { SteamApiClient, SteamPlayer } from './steamApiClient';
 
 /** Online status is considered fresh for this long. */
@@ -73,9 +73,9 @@ export class SteamProfileService {
     }
     const lib = await this.library.load(uid);
     const hasLibrary = profile.gameDetailsVisible === true;
-    const games = lib.entries.map(toAnalyticsGame);
+    const games = statisticsEntries(lib).map(toAnalyticsGame);
     const ach = achievementTotals(games);
-    const recentGames = lib.entries
+    const recentGames = visibleEntries(lib)
       .filter((e) => e.game.playtime2WeeksMinutes > 0)
       .sort((a, b) => b.game.playtime2WeeksMinutes - a.game.playtime2WeeksMinutes)
       .slice(0, 6)
@@ -96,7 +96,7 @@ export class SteamProfileService {
         profileUrl: profile.profileUrl,
         personaState: profile.personaState,
         communityVisibility: profile.communityVisibility,
-        currentGame: profile.currentGame,
+        currentGame: lib.hiddenGames.some((g) => g.appId === profile.currentGame?.appId) ? null : profile.currentGame,
         steamLevel: profile.steamLevel,
         gameDetailsVisible: profile.gameDetailsVisible,
         summaryFetchedAt: profile.summaryFetchedAt.toISOString(),

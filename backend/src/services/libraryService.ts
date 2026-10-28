@@ -1,12 +1,13 @@
 import {
   achievementPercent, actualCostPerHour, estimatedCostPerHour, minutesToHours, round, steamCoverUrl, steamIconUrl,
   type AnalyticsGame, type AppMetadataDoc, type GameDetailDto, type GameListItemDto, type GameListQuery,
-  type OwnedGameDoc, type PurchaseDoc, type UserDoc,
+  type OwnedGameDoc, type PurchaseDoc, type UserDoc, type HiddenGameDoc,
 } from '@steam-analytics/shared';
 import { errors } from '../lib/errors';
 import { toIso } from '../lib/firestore';
 import { LruCache } from '../lib/lru';
 import type { AppCacheRepository } from '../repositories/appCacheRepository';
+import type { HiddenGameRepository } from '../repositories/hiddenGameRepository';
 import type { PurchaseRepository } from '../repositories/purchaseRepository';
 import type { SteamDataRepository } from '../repositories/steamDataRepository';
 import type { UserRepository } from '../repositories/userRepository';
@@ -18,6 +19,7 @@ export interface LibraryEntry {
   meta: AppMetadataDoc | undefined;
   price: EffectivePrice;
   purchase: PurchaseDoc | undefined;
+  hidden?: HiddenGameDoc;
 }
 
 export interface Library {
@@ -25,7 +27,11 @@ export interface Library {
   region: string;
   entries: LibraryEntry[];
   lastPriceUpdateAt: Date | null;
+  hiddenGames: HiddenGameDoc[];
 }
+
+export const statisticsEntries = (lib: Library) => lib.entries.filter((e) => !e.hidden?.excludeFromStats);
+export const visibleEntries = (lib: Library) => lib.entries.filter((e) => !e.hidden);
 
 export function toAnalyticsGame(e: LibraryEntry): AnalyticsGame {
   return {
@@ -44,6 +50,8 @@ export function toListItem(e: LibraryEntry, region: string): GameListItemDto {
   const ag = toAnalyticsGame(e);
   return {
     appId: g.appId,
+    hidden: Boolean(e.hidden),
+    excludedFromStats: e.hidden?.excludeFromStats ?? false,
     name: g.name,
     coverUrl: steamCoverUrl(g.appId, e.meta?.headerImageUrl),
     iconUrl: steamIconUrl(g.appId, g.iconHash),
@@ -84,6 +92,8 @@ const DEFAULT_ORDER: Record<GameListQuery['sort'], 'asc' | 'desc'> = {
 export function queryGames(items: GameListItemDto[], q: GameListQuery) {
   const needle = q.q?.toLocaleLowerCase();
   const filtered = items.filter((g) => {
+    if (q.visibility === 'visible' && g.hidden) return false;
+    if (q.visibility === 'hidden' && !g.hidden) return false;
     if (needle && !g.name.toLocaleLowerCase().includes(needle) && String(g.appId) !== needle) return false;
     if (q.played === 'yes' && g.playtimeForeverMinutes <= 0) return false;
     if (q.played === 'no' && g.playtimeForeverMinutes > 0) return false;
@@ -116,6 +126,7 @@ export class LibraryService {
     private readonly data: SteamDataRepository,
     private readonly purchases: PurchaseRepository,
     private readonly appCache: AppCacheRepository,
+    private readonly hiddenGames: HiddenGameRepository,
   ) {}
 
   async requireLinkedUser(uid: string): Promise<UserDoc & { steamId: string }> {
@@ -133,17 +144,18 @@ export class LibraryService {
     if (cached && cached.version === user.dataVersion && cached.region === region && cached.library.user.steamId === user.steamId) {
       return { ...cached.library, user };
     }
-    const [games, purchases] = await Promise.all([this.data.listGames(uid), this.purchases.list(uid)]);
+    const [games, purchases, hiddenGames] = await Promise.all([this.data.listGames(uid), this.purchases.list(uid), this.hiddenGames.list(uid)]);
     const appIds = games.map((g) => g.appId);
     const [meta, prices] = await Promise.all([this.appCache.getMetadata(appIds), this.appCache.getPrices(appIds, region)]);
     const purchaseMap = new Map(purchases.map((p) => [p.appId, p]));
+    const hiddenMap = new Map(hiddenGames.map((g) => [g.appId, g]));
     let lastPriceUpdateAt: Date | null = null;
     const entries = games.map((game) => {
       const p = prices.get(game.appId);
       if (p && (!lastPriceUpdateAt || p.fetchedAt > lastPriceUpdateAt)) lastPriceUpdateAt = p.fetchedAt;
-      return { game, meta: meta.get(game.appId), price: effectivePrice(meta.get(game.appId), p), purchase: purchaseMap.get(game.appId) };
+      return { game, meta: meta.get(game.appId), price: effectivePrice(meta.get(game.appId), p), purchase: purchaseMap.get(game.appId), hidden: hiddenMap.get(game.appId) };
     });
-    const library: Library = { user, region, entries, lastPriceUpdateAt };
+    const library: Library = { user, region, entries, lastPriceUpdateAt, hiddenGames };
     this.cache.set(uid, { version: user.dataVersion, region, library });
     return library;
   }

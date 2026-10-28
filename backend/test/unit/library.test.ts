@@ -6,7 +6,7 @@ import { needsAchievementSync } from '../../src/services/achievementService';
 import { redact } from '../../src/lib/logger';
 
 const item = (appId: number, name: string, minutes: number, price: number | null, ach: number | null): GameListItemDto => ({
-  appId, name, coverUrl: '', iconUrl: null, playtimeForeverMinutes: minutes, playtimeHours: minutes / 60, playtime2WeeksMinutes: 0, lastPlayedAt: null,
+  appId, name, hidden: false, excludedFromStats: false, coverUrl: '', iconUrl: null, playtimeForeverMinutes: minutes, playtimeHours: minutes / 60, playtime2WeeksMinutes: 0, lastPlayedAt: null,
   achievements: { status: ach === null ? 'unknown' : 'available', total: ach === null ? null : 10, unlocked: ach === null ? null : ach / 10, percent: ach },
   price: { status: price === null ? 'unknown' : 'priced', price: price === null ? null : { amount: price, currency: 'USD' }, initialPrice: null, discountPercent: null, region: 'us', fetchedAt: null },
   estimatedCostPerHour: price !== null && minutes > 0 ? { status: 'ok', value: { amount: price / (minutes / 60), currency: 'USD' } } : minutes === 0 ? { status: 'not_played' } : { status: 'no_price' },
@@ -40,6 +40,16 @@ describe('queryGames', () => {
     const r = queryGames(items, q({ page: 2, pageSize: 3 }));
     expect(r.total).toBe(4);
     expect(r.items.map((g) => g.appId)).toEqual([2]);
+  });
+
+  it('filters visibility before counting and paginating, including search results', () => {
+    const games = items.map((g, i) => ({ ...g, hidden: i < 2, excludedFromStats: i === 0 }));
+    expect(queryGames(games, q({})).items.map((g) => g.appId)).toEqual([4, 3]);
+    expect(queryGames(games, q({ visibility: 'hidden' })).total).toBe(2);
+    expect(queryGames(games, q({ visibility: 'hidden', pageSize: 1 })).items[0]?.appId).toBe(1);
+    expect(queryGames(games, q({ visibility: 'all' })).total).toBe(4);
+    expect(queryGames(games, q({ q: 'Beta' })).total).toBe(0);
+    expect(queryGames(games, q({ visibility: 'hidden', q: 'Beta' })).total).toBe(1);
   });
 });
 

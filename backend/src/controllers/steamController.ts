@@ -1,5 +1,5 @@
 import type { CookieOptions } from 'express';
-import { appIdSchema, gameListQuerySchema, syncRequestSchema } from '@steam-analytics/shared';
+import { appIdSchema, gameListQuerySchema, gameVisibilitySchema, syncRequestSchema } from '@steam-analytics/shared';
 import type { Container } from '../container';
 import { handler } from '../middleware/asyncHandler';
 import { currentUser } from '../middleware/auth';
@@ -66,6 +66,15 @@ export function steamController(c: Container) {
       const uid = currentUser(req).uid;
       const dto = await c.library.detail(uid, appId);
       ok(res, dto, { source: 'cache' });
+    }),
+
+    visibility: handler(async (req, res) => {
+      const appId = appIdSchema.parse(req.params.appid);
+      const input = gameVisibilitySchema.parse(req.body);
+      const { uid } = currentUser(req);
+      await c.hiddenGames.set(uid, appId, input);
+      c.library.invalidate(uid);
+      ok(res, await c.library.detail(uid, appId));
     }),
 
     achievements: handler(async (req, res) => {

@@ -6,6 +6,7 @@ import { createRefs } from './repositories/refs';
 import { UserRepository } from './repositories/userRepository';
 import { SteamDataRepository } from './repositories/steamDataRepository';
 import { PurchaseRepository } from './repositories/purchaseRepository';
+import { HiddenGameRepository } from './repositories/hiddenGameRepository';
 import { AppCacheRepository } from './repositories/appCacheRepository';
 import { SyncJobRepository } from './repositories/syncJobRepository';
 import { SteamApiClient } from './services/steamApiClient';
@@ -37,13 +38,14 @@ export function createContainer({ env, db, auth, fetchImpl, limiters, retries }:
   const users = new UserRepository(refs);
   const steamData = new SteamDataRepository(refs);
   const purchases = new PurchaseRepository(refs);
+  const hiddenGames = new HiddenGameRepository(refs);
   const appCache = new AppCacheRepository(refs);
   const jobs = new SyncJobRepository(refs);
 
   const steam = new SteamApiClient({ apiKey: env.STEAM_API_KEY, fetchImpl, limiter: limiters?.web, retries });
   const store = new SteamStoreClient({ fetchImpl, limiter: limiters?.store, retries });
 
-  const library = new LibraryService(users, steamData, purchases, appCache);
+  const library = new LibraryService(users, steamData, purchases, appCache, hiddenGames);
   const profiles = new SteamProfileService(steam, steamData, library);
   const links = new SteamLinkService(refs, steamData, { publicApiUrl: env.PUBLIC_API_URL, fetchImpl });
   const achievements = new AchievementService(steam, appCache, steamData);
@@ -57,7 +59,7 @@ export function createContainer({ env, db, auth, fetchImpl, limiters, retries }:
   const purchaseService = new PurchaseService(purchases, library, users);
   const imports = new ImportService(library, purchases);
 
-  return { env, auth, refs, users, steamData, purchases, appCache, library, profiles, links, achievements, pricing, sync, analytics, account, purchaseService, imports };
+  return { env, auth, refs, users, steamData, purchases, hiddenGames, appCache, library, profiles, links, achievements, pricing, sync, analytics, account, purchaseService, imports };
 }
 
 export type Container = ReturnType<typeof createContainer>;

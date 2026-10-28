@@ -10,6 +10,7 @@ import SteamRequired from '@/components/steam/SteamRequired.vue';
 import GameFilters from '@/components/steam/GameFilters.vue';
 import type { FilterState } from '@/components/steam/filters';
 import GameCard from '@/components/steam/GameCard.vue';
+import GameVisibilityControls from '@/components/steam/GameVisibilityControls.vue';
 import PriceTag from '@/components/steam/PriceTag.vue';
 import AchievementProgress from '@/components/steam/AchievementProgress.vue';
 import ErrorState from '@/components/ui/ErrorState.vue';
@@ -34,6 +35,7 @@ const fromQuery = (): FilterState => ({
 });
 
 const filters = ref<FilterState>(fromQuery());
+const visibility = ref<'visible' | 'hidden'>(route.query.visibility === 'hidden' ? 'hidden' : 'visible');
 const page = ref(Number(route.query.page) > 0 ? Number(route.query.page) : 1);
 const view = ref<'grid' | 'list'>('grid');
 const debouncedQ = ref(filters.value.q);
@@ -43,9 +45,9 @@ watch(() => filters.value.q, (q) => {
   clearTimeout(timer);
   timer = setTimeout(() => (debouncedQ.value = q), 250);
 });
-watch(() => [filters.value.sort, filters.value.order, filters.value.played, filters.value.achievements, debouncedQ.value], () => (page.value = 1));
+watch(() => [filters.value.sort, filters.value.order, filters.value.played, filters.value.achievements, debouncedQ.value, visibility.value], () => (page.value = 1));
 
-const query = computed(() => ({ ...filters.value, q: debouncedQ.value, page: page.value, pageSize: PAGE_SIZE }));
+const query = computed(() => ({ ...filters.value, q: debouncedQ.value, visibility: visibility.value, page: page.value, pageSize: PAGE_SIZE }));
 watch(query, (q) => {
   const next: Record<string, string> = {};
   if (q.q) next.q = q.q;
@@ -53,6 +55,7 @@ watch(query, (q) => {
   if (q.order) next.order = q.order;
   if (q.played !== 'all') next.played = q.played;
   if (q.achievements !== 'all') next.achievements = q.achievements;
+  if (q.visibility === 'hidden') next.visibility = 'hidden';
   if (q.page > 1) next.page = String(q.page);
   void router.replace({ query: next });
 });
@@ -60,6 +63,10 @@ watch(query, (q) => {
 const games = useApi(() => api.get<GameListItemDto[]>('/steam/games', query.value), [query, () => steam.dataRevision]);
 const total = computed(() => games.meta.value?.total ?? 0);
 const pages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)));
+watch(pages, (count) => { if (page.value > count) page.value = count; });
+
+// Keep the selected list in sync with browser back/forward navigation.
+watch(() => route.query.visibility, (value) => { visibility.value = value === 'hidden' ? 'hidden' : 'visible'; });
 </script>
 
 <template>
@@ -76,17 +83,25 @@ const pages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)));
         </div>
       </div>
 
+      <div class="flex gap-2" role="group" :aria-label="$t('library.visibility')">
+        <button type="button" class="btn" :class="visibility === 'visible' ? 'btn-primary' : 'btn-secondary'" :aria-pressed="visibility === 'visible'" @click="visibility = 'visible'">{{ $t('library.visibleGames') }}</button>
+        <button type="button" class="btn" :class="visibility === 'hidden' ? 'btn-primary' : 'btn-secondary'" :aria-pressed="visibility === 'hidden'" @click="visibility = 'hidden'">{{ $t('library.hiddenGames') }}</button>
+      </div>
+      <p v-if="visibility === 'hidden'" class="text-sm text-muted">{{ $t('library.hiddenHint') }}</p>
       <GameFilters v-model="filters" />
 
       <ErrorState v-if="games.error.value" :error="games.error.value" @retry="games.reload" />
       <div v-else-if="games.loading.value && !games.data.value" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <SkeletonBlock v-for="n in 8" :key="n" class="h-72 rounded-xl" />
       </div>
-      <EmptyState v-else-if="games.data.value && games.data.value.length === 0" icon="search" :title="$t('library.emptyTitle')" :description="$t('library.emptyDescription')" />
+      <EmptyState v-else-if="games.data.value && games.data.value.length === 0" icon="search" :title="$t(visibility === 'hidden' ? 'library.hiddenEmptyTitle' : 'library.emptyTitle')" :description="$t(visibility === 'hidden' ? 'library.hiddenEmptyDescription' : 'library.emptyDescription')" />
       <template v-else-if="games.data.value">
         <p class="text-sm text-muted" aria-live="polite">{{ $t('library.count', { n: f.number(total) }) }}</p>
         <div v-if="view === 'grid'" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" :class="{ 'opacity-60': games.loading.value }">
-          <GameCard v-for="g in games.data.value" :key="g.appId" :game="g" />
+          <div v-for="g in games.data.value" :key="g.appId" class="flex flex-col gap-2">
+            <GameCard :game="g" class="flex-1" />
+            <GameVisibilityControls :game="g" />
+          </div>
         </div>
         <div v-else class="card overflow-x-auto p-0">
           <table class="w-full min-w-[56rem] text-sm">
@@ -100,6 +115,7 @@ const pages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)));
                 <th class="w-40 px-4 py-3">{{ $t('nav.achievements') }}</th>
                 <th class="px-4 py-3 text-right">{{ $t('game.price') }}</th>
                 <th class="px-4 py-3 text-right">{{ $t('cost.estimatedPerHour') }}</th>
+                <th class="px-4 py-3">{{ $t('library.visibility') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -112,6 +128,7 @@ const pages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)));
                 <td class="px-4 py-2"><AchievementProgress :summary="g.achievements" /></td>
                 <td class="px-4 py-2 text-right"><PriceTag :price="g.price" /></td>
                 <td class="px-4 py-2 text-right">{{ f.costPerHour(g.estimatedCostPerHour) }}</td>
+                <td class="px-4 py-2"><GameVisibilityControls :game="g" /></td>
               </tr>
             </tbody>
           </table>

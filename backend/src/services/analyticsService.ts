@@ -6,12 +6,12 @@ import {
 } from '@steam-analytics/shared';
 import { toIso } from '../lib/firestore';
 import type { SteamDataRepository } from '../repositories/steamDataRepository';
-import { toAnalyticsGame, type Library, type LibraryService } from './libraryService';
+import { statisticsEntries, toAnalyticsGame, type Library, type LibraryService } from './libraryService';
 
 const TOP_N = 10;
 
 function gameValues(lib: Library): GameValueDto[] {
-  return lib.entries
+  return statisticsEntries(lib)
     .map(toAnalyticsGame)
     .filter((g) => g.isGame !== false)
     .flatMap((g) => {
@@ -35,7 +35,7 @@ export class AnalyticsService {
 
   async overview(uid: string): Promise<{ dto: OverviewDto; lib: Library }> {
     const lib = await this.library.load(uid);
-    const games = lib.entries.map(toAnalyticsGame);
+    const games = statisticsEntries(lib).map(toAnalyticsGame);
     const pt = summarizePlaytime(games, TOP_N);
     const values = gameValues(lib);
     return {
@@ -60,8 +60,9 @@ export class AnalyticsService {
 
   async playtime(uid: string): Promise<{ dto: PlaytimeAnalyticsDto; lib: Library }> {
     const [lib, snapshots] = await Promise.all([this.library.load(uid), this.data.listSnapshots(uid)]);
-    const games = lib.entries.map(toAnalyticsGame);
+    const games = statisticsEntries(lib).map(toAnalyticsGame);
     const pt = summarizePlaytime(games, TOP_N);
+    const excluded = new Set(lib.hiddenGames.filter((g) => g.excludeFromStats).map((g) => g.appId));
     return {
       lib,
       dto: {
@@ -73,14 +74,17 @@ export class AnalyticsService {
         mostPlayed: pt.mostPlayed,
         top10: pt.top,
         distribution: playtimeDistribution(games),
-        trend: snapshotDeltas(snapshots),
+        trend: snapshotDeltas(snapshots.map((snapshot) => ({
+          ...snapshot,
+          games: Object.fromEntries(Object.entries(snapshot.games).filter(([appId]) => !excluded.has(Number(appId)))),
+        }))),
       },
     };
   }
 
   async achievements(uid: string): Promise<{ dto: AchievementAnalyticsDto; lib: Library }> {
     const lib = await this.library.load(uid);
-    const games = lib.entries.map(toAnalyticsGame);
+    const games = statisticsEntries(lib).map(toAnalyticsGame);
     const byGame = games
       .filter((g) => g.achievements.status === 'available' && (g.achievements.total ?? 0) > 0)
       .map((g) => ({
@@ -96,10 +100,10 @@ export class AnalyticsService {
 
   async libraryValue(uid: string): Promise<{ dto: LibraryValueDto; lib: Library }> {
     const lib = await this.library.load(uid);
-    const games = lib.entries.map(toAnalyticsGame);
+    const games = statisticsEntries(lib).map(toAnalyticsGame);
     const purchases = games.flatMap((g) => (g.purchase ? [g.purchase] : []));
     // A bundle is one transaction; its games' shares already add up to the bundle total.
-    const records = lib.entries.flatMap((e) => (e.purchase ? [e.purchase] : []));
+    const records = statisticsEntries(lib).flatMap((e) => (e.purchase ? [e.purchase] : []));
     const bundleIds = new Set(records.flatMap((p) => (p.bundle ? [p.bundle.id] : [])));
     const singles = records.filter((p) => !p.bundle).length;
     return {
@@ -119,7 +123,7 @@ export class AnalyticsService {
 
   async costEfficiency(uid: string, basis: 'estimated' | 'actual'): Promise<{ dto: CostEfficiencyDto; lib: Library }> {
     const lib = await this.library.load(uid);
-    const games = lib.entries.map(toAnalyticsGame).filter((g) => g.isGame !== false || g.purchase);
+    const games = statisticsEntries(lib).map(toAnalyticsGame).filter((g) => g.isGame !== false || g.purchase);
     const items: CostEfficiencyItemDto[] = games.map((g) => ({
       appId: g.appId,
       name: g.name,
