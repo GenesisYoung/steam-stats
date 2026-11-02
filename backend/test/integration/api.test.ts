@@ -481,6 +481,72 @@ d('backend integration (emulators + fake Steam)', () => {
     });
   });
 
+  // ---------- Dota 2 ----------
+
+  describe('dota', () => {
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+    const ACCOUNT = 39734283; // STEAM_A as a 32-bit account id
+
+    function fakeOpenDota() {
+      const summary = { match_id: 77, player_slot: 0, radiant_win: true, duration: 1800, game_mode: 22, lobby_type: 7, hero_id: 1, start_time: 1_760_000_000, kills: 5, deaths: 1, assists: 4, gold_per_min: 500, xp_per_min: 600 };
+      const match = { match_id: 77, start_time: 1_760_000_000, duration: 1800, game_mode: 22, lobby_type: 7, radiant_win: true, radiant_score: 20, dire_score: 5, od_data: { has_parsed: false }, players: [{ account_id: ACCOUNT, hero_id: 1, player_slot: 0, kills: 5, deaths: 1, assists: 4 }, { account_id: null, hero_id: 2, player_slot: 128, kills: 1, deaths: 5, assists: 0 }] };
+      h.steam.overrides.push({
+        match: '/api/',
+        handler: (url) => {
+          if (url.host !== 'api.opendota.com') throw new Error(`Unexpected host ${url.host}`);
+          const path = url.pathname;
+          if (path === '/api/constants/heroes') return json({ 1: { id: 1, localized_name: 'Anti-Mage' }, 2: { id: 2, localized_name: 'Axe' } });
+          if (path === '/api/constants/items') return json({});
+          if (path === `/api/players/${ACCOUNT}`) return json({ profile: { personaname: 'Gordon' }, rank_tier: 55 });
+          if (path === `/api/players/${ACCOUNT}/matches`) return json([summary]);
+          if (path === '/api/matches/77') return json(match);
+          return json({ error: 'Not Found' }, 404);
+        },
+      });
+    }
+
+    it('requires sign-in and a linked Steam account', async () => {
+      await h.http().get('/api/dota/overview').expect(401);
+      const user = await createUser(h);
+      await h.http().get('/api/me').set('Authorization', user.bearer).expect(200);
+      const res = await h.http().get('/api/dota/overview').set('Authorization', user.bearer).expect(409);
+      expect(res.body.error.code).toBe('STEAM_NOT_LINKED');
+    });
+
+    it('reports an OpenDota outage with its own error code', async () => {
+      const user = await linkedUser();
+      h.steam.overrides.push({ match: '/api/', handler: () => json({}, 500) });
+      const res = await h.http().get('/api/dota/overview').set('Authorization', user.bearer).expect(502);
+      expect(res.body.error.code).toBe('DOTA_UNAVAILABLE');
+    });
+
+    it('serves the overview, match records and a match analysis for the linked account', async () => {
+      const user = await linkedUser();
+      fakeOpenDota();
+      const overview = await h.http().get('/api/dota/overview').set('Authorization', user.bearer).expect(200);
+      expect(overview.body.data.player).toMatchObject({ accountId: ACCOUNT, personaName: 'Gordon', rankTier: 55 });
+      expect(overview.body.data.totals).toMatchObject({ games: 1, wins: 1, winRate: 100 });
+      expect(overview.body.meta.dataAsOf).toBeTruthy();
+
+      const list = await h.http().get('/api/dota/matches').query({ result: 'win' }).set('Authorization', user.bearer).expect(200);
+      expect(list.body.meta.total).toBe(1);
+      expect(list.body.data.items[0]).toMatchObject({ matchId: 77, won: true, hero: { name: 'Anti-Mage' } });
+
+      const detail = await h.http().get('/api/dota/matches/77').set('Authorization', user.bearer).expect(200);
+      expect(detail.body.data.parsed).toBe(false);
+      expect(detail.body.data.performance.won).toBe(true);
+      expect(detail.body.data.players[0].isYou).toBe(true);
+      expect(detail.body.data.players[1].name).toBeNull();
+    });
+
+    it('validates match ids and answers 404 for unknown matches', async () => {
+      const user = await linkedUser();
+      fakeOpenDota();
+      await h.http().get('/api/dota/matches/abc').set('Authorization', user.bearer).expect(400);
+      await h.http().get('/api/dota/matches/404').set('Authorization', user.bearer).expect(404);
+    });
+  });
+
   // ---------- Account deletion ----------
 
   describe('hidden games', () => {

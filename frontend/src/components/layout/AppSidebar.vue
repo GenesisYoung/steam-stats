@@ -10,6 +10,7 @@ const items = [
   { name: 'achievements', icon: 'trophy' },
   { name: 'analytics', icon: 'chart' },
   { name: 'valuation', icon: 'wallet' },
+  { name: 'dota', icon: 'swords' },
   { name: 'settings', icon: 'settings' },
 ] as const;
 </script>

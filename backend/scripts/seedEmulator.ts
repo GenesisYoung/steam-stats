@@ -4,7 +4,10 @@
  * without a Steam API key. Refuses to run against a real project.
  *
  *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8180 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
- *     npx tsx backend/scripts/seedEmulator.ts <email>
+ *     npx tsx backend/scripts/seedEmulator.ts <email> [steamId64]
+ *
+ * Pass the SteamID64 of an account with public Dota 2 match data to preview the
+ * Dota pages; the default fake SteamID has no Dota account.
  *
  * Local emulator test account used during development (emulator only, not a real account):
  *   email: demo@example.test   password: demo-pass-8421
@@ -25,7 +28,7 @@ if (!email) {
 const { db, auth } = initFirebase(process.env.FIREBASE_PROJECT_ID ?? 'demo-steam-analytics');
 const user = await auth.getUserByEmail(email);
 const uid = user.uid;
-const steamId = '76561190000000001';
+const steamId = process.argv[3] ?? '76561190000000001';
 const now = new Date();
 const day = 86_400_000;
 

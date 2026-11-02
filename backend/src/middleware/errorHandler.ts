@@ -31,7 +31,9 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
     };
   } else if (err instanceof UpstreamError) {
     status = 502;
-    body = { error: { code: 'STEAM_UNAVAILABLE', message: 'Steam is temporarily unavailable. Please try again later.' } };
+    body = err.service === 'opendota'
+      ? { error: { code: 'DOTA_UNAVAILABLE', message: 'OpenDota is temporarily unavailable. Please try again later.' } }
+      : { error: { code: 'STEAM_UNAVAILABLE', message: 'Steam is temporarily unavailable. Please try again later.' } };
     logger.warn('upstream error', { service: err.service, status: err.status, path: req.path });
   } else if ((err as { type?: string }).type === 'entity.parse.failed') {
     status = 400;

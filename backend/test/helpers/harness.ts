@@ -33,7 +33,7 @@ export function createHarness(overrides: Record<string, string> = {}) {
   const steam = new FakeSteam();
   const container = createContainer({
     env, db, auth, fetchImpl: steam.fetch, retries: 1,
-    limiters: { web: new TokenBucket(10_000, 10_000), store: new TokenBucket(10_000, 10_000) },
+    limiters: { web: new TokenBucket(10_000, 10_000), store: new TokenBucket(10_000, 10_000), openDota: new TokenBucket(10_000, 10_000) },
   });
   const app = createApp(container);
   return { env, db, auth, steam, container, app, http: () => request(app) };

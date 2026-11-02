@@ -5,7 +5,7 @@
 - 前端：Vue 3（Composition API）+ TypeScript + Vite + Pinia + Vue Router + Tailwind CSS v4 + Apache ECharts + Vue I18n（English / 简体中文）
 - 后端：Node.js + Express 5 + TypeScript + Zod + Firebase Admin SDK
 - 数据：Cloud Firestore（安全规则 + 索引 + TTL）、Firebase Authentication
-- 集成：Steam Web API（官方文档接口）、Steam OpenID 2.0、Steam 商店公开价格数据
+- 集成：Steam Web API（官方文档接口）、Steam OpenID 2.0、Steam 商店公开价格数据、OpenDota（Dota 2 比赛数据）
 
 ## 文档
 

@@ -47,6 +47,26 @@ export const gameVisibilitySchema = z.object({
 }).strict();
 export type GameVisibilityInput = z.infer<typeof gameVisibilitySchema>;
 
+export const dotaMatchIdSchema = z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+
+const dotaQueue = z.enum(['all', 'ranked', 'unranked', 'turbo']).default('all');
+
+export const dotaOverviewQuerySchema = z.object({
+  /** Most recent N matches of the selected queue. */
+  window: z.enum(['all', '500', '100', '20']).default('all'),
+  queue: dotaQueue,
+});
+export type DotaOverviewQuery = z.infer<typeof dotaOverviewQuerySchema>;
+
+export const dotaMatchListQuerySchema = z.object({
+  queue: dotaQueue,
+  result: z.enum(['all', 'win', 'loss']).default('all'),
+  heroId: z.coerce.number().int().positive().max(100_000).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+});
+export type DotaMatchListQuery = z.infer<typeof dotaMatchListQuerySchema>;
+
 const isoDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)

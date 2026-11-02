@@ -21,6 +21,8 @@ const envSchema = z.object({
   /** Directory of the built frontend to serve from this server (App Hosting). Unset = API only. */
   FRONTEND_DIST: z.string().optional(),
   STEAM_API_KEY: z.string().regex(/^[A-F0-9]{32}$/i, 'STEAM_API_KEY must be a 32-character hex key'),
+  /** Optional: raises OpenDota's rate limits. Dota 2 data works without it. */
+  OPENDOTA_API_KEY: z.string().optional().transform((v) => v || undefined),
   REQUIRE_EMAIL_VERIFIED: bool.default(true),
   CRON_SECRET: z
     .string()

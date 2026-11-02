@@ -19,6 +19,7 @@
 | `ISteamUserStats/GetPlayerAchievements/v1` | 是 | 官方文档接口；游戏无统计数据或资料私密时返回错误 |
 | `ISteamUserStats/GetSchemaForGame/v2` | 是 | 官方文档接口；提供成就名称、描述、图标 |
 | `ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2` | 否 | 实测可用；返回全局解锁率 |
+| `api.opendota.com/api`（2026-11-01 实测） | 否 | 第三方服务。响应头显示免费额度 60 次/分钟、3000 次/天；`/players/{id}/matches` 默认排除加速等模式，需 `significant=0`；未解析比赛没有时间线和购买记录；很早的比赛用 0 表示缺失的比分和净资产 |
 | `store.steampowered.com/api/appdetails` | 否 | **非 Steamworks 正式文档接口**，但为 Steam 商店自身使用的公开接口。实测：多 appid + `filters=price_overview` 可批量取价；免费游戏返回 `data: []`；不存在/下架返回 `success:false`；单 appid + `filters=basic,price_overview` 返回 `type`、`is_free` |
 
 > 关于定价：Steamworks Web API 没有面向第三方的"商店价格"官方文档接口，`appdetails` 是业界唯一可行且合法的公开数据源。系统将其明确标注为"Steam 商店公开数据（非官方 API，可能变更）"，并做了严格的限流（约 200 次/5 分钟）、缓存与失败降级。
@@ -157,6 +158,7 @@ steamApps/{appid}/schemas/{lang}             AchievementSchemaDoc（共享：成
 - **成就状态按游戏存为单文档**（`achievements/state`，内含 `{ apiName: unlockTime }` map），而不是每个成就一个文档：一个 100 成就的游戏，同步写入从 100 次降为 1 次，读取同理。成就的名称/图标/描述属于游戏而非用户，放在共享集合 `steamApps/{appid}/schemas/{lang}`，所有用户复用缓存。
 - **快照按天作为文档 ID**：同一天多次同步只覆盖当天快照，天然去重；文档内存储 `{ appid: playtimeMinutes }`，1MB 限制足以容纳上万款游戏。
 - **读取优化**：库/分析接口在后端按 `uid + librarySyncVersion` 做内存 LRU 缓存；每次请求只需读 1 次 `users/{uid}` 来判断缓存是否失效。同步时只写入发生变化的游戏文档。
+- **Dota 2 数据不写入 Firestore**：比赛数据公开且可随时重新获取，后端只做内存缓存（比赛历史 3 分钟、已解析比赛 24 小时、未解析比赛 5 分钟、英雄与物品常量 24 小时），因此无需新增集合、安全规则或解绑清理。加速模式的金钱和经验偏高，单场对比只使用同类比赛。
 - **TTL**：`linkSessions.expiresAt`、`openidNonces.expiresAt` 配置 Firestore TTL 策略自动清理。
 
 完整 TypeScript 接口见 `shared/src/models.ts`，规则见 `firebase/firestore.rules`，索引见 `firebase/firestore.indexes.json`。
@@ -199,9 +201,14 @@ steamApps/{appid}/schemas/{lang}             AchievementSchemaDoc（共享：成
 | GET | `/api/purchases` | 自填购买记录 |
 | PUT | `/api/purchases/:appid` | 新增/修改（必须是已拥有的游戏） |
 | DELETE | `/api/purchases/:appid` | 删除 |
+| GET | `/api/dota/overview` | Dota 2 总体分析 |
+| GET | `/api/dota/matches` | Dota 2 比赛记录 |
+| GET | `/api/dota/matches/:matchId` | 单场比赛详情与个人分析 |
+| POST | `/api/dota/matches/:matchId/parse` | 请求解析录像 |
+| POST | `/api/dota/refresh` | 请求 OpenDota 更新账号数据 |
 | POST | `/internal/cron/sync` | Cloud Scheduler 调用（`X-Cron-Secret`，常量时间比较） |
 
-错误码：`UNAUTHENTICATED`、`FORBIDDEN`、`EMAIL_NOT_VERIFIED`、`RECENT_LOGIN_REQUIRED`、`VALIDATION_FAILED`、`NOT_FOUND`、`STEAM_NOT_LINKED`、`STEAM_ALREADY_LINKED`、`STEAM_PROFILE_PRIVATE`、`STEAM_UNAVAILABLE`、`SYNC_IN_PROGRESS`、`RATE_LIMITED`、`INTERNAL`。
+错误码：`UNAUTHENTICATED`、`FORBIDDEN`、`EMAIL_NOT_VERIFIED`、`RECENT_LOGIN_REQUIRED`、`VALIDATION_FAILED`、`NOT_FOUND`、`STEAM_NOT_LINKED`、`STEAM_ALREADY_LINKED`、`STEAM_PROFILE_PRIVATE`、`STEAM_UNAVAILABLE`、`DOTA_UNAVAILABLE`、`SYNC_IN_PROGRESS`、`RATE_LIMITED`、`INTERNAL`。
 
 ---
 

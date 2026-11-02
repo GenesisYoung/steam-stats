@@ -59,5 +59,16 @@ export function useFormat() {
     }
   };
 
-  return { number, money, totals, hours, date, relative, percent, costPerHour };
+  /** Game clock: 34:05, 1:02:09, or -1:29 for the pre-game. */
+  const clock = (seconds: number | null | undefined) => {
+    if (seconds === null || seconds === undefined) return t('common.unavailable');
+    const abs = Math.abs(Math.round(seconds));
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const h = Math.floor(abs / 3600);
+    const m = Math.floor((abs % 3600) / 60);
+    const body = h > 0 ? `${h}:${pad(m)}:${pad(abs % 60)}` : `${m}:${pad(abs % 60)}`;
+    return seconds < 0 ? `-${body}` : body;
+  };
+
+  return { number, money, totals, hours, date, relative, percent, costPerHour, clock };
 }

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Container } from '../container';
 import { accountController } from '../controllers/accountController';
 import { analyticsController } from '../controllers/analyticsController';
+import { dotaController } from '../controllers/dotaController';
 import { internalController } from '../controllers/internalController';
 import { purchaseController } from '../controllers/purchaseController';
 import { steamController } from '../controllers/steamController';
@@ -17,6 +18,7 @@ export function apiRouter(c: Container): Router {
   const steam = steamController(c);
   const analytics = analyticsController(c);
   const purchases = purchaseController(c);
+  const dota = dotaController(c);
 
   router.get('/health', (_req, res) => res.json({ data: { status: 'ok' } }));
 
@@ -46,6 +48,12 @@ export function apiRouter(c: Container): Router {
   router.get('/analytics/achievements', analytics.achievements);
   router.get('/analytics/library-value', analytics.libraryValue);
   router.get('/analytics/cost-efficiency', analytics.costEfficiency);
+
+  router.get('/dota/overview', dota.overview);
+  router.get('/dota/matches', dota.matches);
+  router.get('/dota/matches/:matchId', limiter({ windowMs: MIN, limit: 30, perUser: true }), dota.match);
+  router.post('/dota/matches/:matchId/parse', limiter({ windowMs: 15 * MIN, limit: 10, perUser: true }), dota.requestParse);
+  router.post('/dota/refresh', limiter({ windowMs: 15 * MIN, limit: 10, perUser: true }), dota.refresh);
 
   router.get('/purchases', purchases.list);
   router.post('/purchases/bundles', purchases.createBundle);

@@ -21,6 +21,8 @@ import { AnalyticsService } from './services/analyticsService';
 import { AccountService } from './services/accountService';
 import { PurchaseService } from './services/purchaseService';
 import { ImportService } from './services/importService';
+import { OpenDotaClient } from './services/openDotaClient';
+import { DotaService } from './services/dotaService';
 import type { TokenBucket } from './lib/http';
 
 export interface ContainerDeps {
@@ -29,7 +31,7 @@ export interface ContainerDeps {
   auth: Auth;
   /** Injected in tests to mock every Steam HTTP call. */
   fetchImpl?: FetchLike;
-  limiters?: { web?: TokenBucket; store?: TokenBucket };
+  limiters?: { web?: TokenBucket; store?: TokenBucket; openDota?: TokenBucket };
   retries?: number;
 }
 
@@ -58,8 +60,10 @@ export function createContainer({ env, db, auth, fetchImpl, limiters, retries }:
   const account = new AccountService(refs, users, auth);
   const purchaseService = new PurchaseService(purchases, library, users);
   const imports = new ImportService(library, purchases);
+  const openDota = new OpenDotaClient({ apiKey: env.OPENDOTA_API_KEY, fetchImpl, limiter: limiters?.openDota, retries });
+  const dota = new DotaService(openDota, library);
 
-  return { env, auth, refs, users, steamData, purchases, hiddenGames, appCache, library, profiles, links, achievements, pricing, sync, analytics, account, purchaseService, imports };
+  return { env, auth, refs, users, steamData, purchases, hiddenGames, appCache, library, profiles, links, achievements, pricing, sync, analytics, account, purchaseService, imports, dota };
 }
 
 export type Container = ReturnType<typeof createContainer>;

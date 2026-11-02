@@ -75,6 +75,7 @@ Steam OpenID **无需在 Steam 侧预先注册**回调地址。后端根据 `PUB
 | `PUBLIC_API_URL` | ✓ | 浏览器访问 `/api` 的源（同源部署时与上面相同） |
 | `FIREBASE_PROJECT_ID` | ✓ | Firebase 项目 ID |
 | `STEAM_API_KEY` | ✓ | Steam Web API Key |
+| `OPENDOTA_API_KEY` | | 可选，提高 OpenDota 限额（默认 60 次/分钟、3000 次/天，由整个服务器共享） |
 | `GOOGLE_APPLICATION_CREDENTIALS` | 本地 | 服务账号 JSON 路径（Cloud Run 上留空，使用默认凭据） |
 | `REQUIRE_EMAIL_VERIFIED` | | 关联 Steam 是否要求已验证邮箱，默认 `true` |
 | `CRON_SECRET` | | ≥32 字符；为空则禁用 `/internal/cron/sync` |

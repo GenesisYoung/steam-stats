@@ -33,6 +33,15 @@ const routes: RouteRecordRaw[] = [
       { path: 'achievements', name: 'achievements', component: () => import('@/views/AchievementsView.vue'), meta: { titleKey: 'nav.achievements' } },
       { path: 'analytics', name: 'analytics', component: () => import('@/views/AnalyticsView.vue'), meta: { titleKey: 'nav.analytics' } },
       { path: 'valuation', name: 'valuation', component: () => import('@/views/ValuationView.vue'), meta: { titleKey: 'nav.valuation' } },
+      {
+        path: 'dota',
+        component: () => import('@/views/DotaLayoutView.vue'),
+        children: [
+          { path: '', name: 'dota', component: () => import('@/views/DotaOverviewView.vue'), meta: { titleKey: 'nav.dota' } },
+          { path: 'matches', name: 'dota-matches', component: () => import('@/views/DotaMatchesView.vue'), meta: { titleKey: 'dota.matchesTab' } },
+          { path: 'matches/:matchid(\\d+)', name: 'dota-match', component: () => import('@/views/DotaMatchView.vue'), props: (r) => ({ matchId: r.params.matchid as string }), meta: { titleKey: 'dota.matchesTab' } },
+        ],
+      },
       { path: 'purchases/import', name: 'import', component: () => import('@/views/ImportView.vue'), meta: { titleKey: 'import.title' } },
       { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue'), meta: { titleKey: 'nav.settings' } },
     ],

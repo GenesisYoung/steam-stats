@@ -134,6 +134,20 @@ Steam 回调。校验后 `303` 跳转到：
 
 ---
 
+## Dota 2
+
+数据来自 OpenDota（第三方服务）。只包含 OpenDota 已记录的比赛，用户需在 Dota 2 客户端开启“公开比赛数据”。所有接口都要求已关联 Steam；未关联返回 `409 STEAM_NOT_LINKED`，OpenDota 不可用返回 `502 DOTA_UNAVAILABLE`。
+
+| 接口 | 返回 | 说明 |
+|---|---|---|
+| `GET /dota/overview?window=all\|500\|100\|20&queue=all\|ranked\|unranked\|turbo` | `DotaOverviewDto` | 胜率、KDA、连胜连败、英雄统计、按模式/时长/阵营/组队拆分、每月与滚动胜率、规则生成的洞察。历史为空时 `matchesTotal` 为 0，未知值为 `null` 而不是 0 |
+| `GET /dota/matches?queue&result=all\|win\|loss&heroId&page&pageSize` | `DotaMatchListDto` | 比赛记录，最新在前；`meta.total` 为筛选后的总数 |
+| `GET /dota/matches/:matchId` | `DotaMatchDetailDto` | 记分板与时间线。用户参加了该比赛时 `performance` 含个人分析，否则为 `null`；比赛不存在返回 `404` |
+| `POST /dota/matches/:matchId/parse` → `202` | `DotaParseRequestDto` | 请求 OpenDota 解析录像（限 10 次/15 分钟）。解析在后台进行，完成后才有时间线和出装数据 |
+| `POST /dota/refresh` → `204` | | 请求 OpenDota 更新该账号的比赛和段位（限 10 次/15 分钟），新比赛可能需要几分钟才出现 |
+
+---
+
 ## 购买记录（模型 B）
 
 ### `GET /purchases` → `PurchaseDto[]`

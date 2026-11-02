@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { DOTA_COMPARISON_METRICS, DOTA_DURATION_BUCKETS, DOTA_INSIGHT_CODES } from '@steam-analytics/shared';
 import en from '../src/locales/en';
 import zhCN from '../src/locales/zh-CN';
 
@@ -35,6 +36,15 @@ describe('locales', () => {
     }
     const missing = [...used].filter((k) => k.includes('.') && !enKeys.has(k));
     expect(missing).toEqual([]);
+  });
+
+  it('every Dota key built at runtime exists', () => {
+    const dynamic = [
+      ...DOTA_INSIGHT_CODES.map((c) => `dota.insight.${c}`),
+      ...DOTA_COMPARISON_METRICS.map((m) => `dota.metrics.${m}`),
+      ...DOTA_DURATION_BUCKETS.map((b) => `dota.duration.${b}`),
+    ];
+    expect(dynamic.filter((k) => !enKeys.has(k))).toEqual([]);
   });
 
   it('messages avoid characters reserved by vue-i18n', () => {
